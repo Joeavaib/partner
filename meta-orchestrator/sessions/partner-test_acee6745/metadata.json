@@ -1,0 +1,9 @@
+{
+  "id": "acee6745",
+  "name": "partner-test",
+  "created_at": "2026-03-01T20:14:31.294234",
+  "parent": null,
+  "status": "created",
+  "original_prompt": "Kannst du mir den Aufbau des Meta-Orchestrators erkl\u00e4ren und wie die RAG Engine funktioniert?",
+  "has_ml_context": true
+}

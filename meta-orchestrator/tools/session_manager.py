@@ -1,0 +1,251 @@
+#!/usr/bin/env python3
+"""
+Session Manager
+- Handles branch sessions and comparison
+"""
+import json
+import subprocess
+import hashlib
+import sys
+import os
+import shutil
+from pathlib import Path
+from datetime import datetime
+
+# Add import for RAG engine
+try:
+    from rag_engine import RAGEngine
+except ImportError:
+    sys.path.append(str(Path(__file__).resolve().parent))
+    from rag_engine import RAGEngine
+
+class SessionManager:
+    """Manages CXM branch sessions"""
+    def __init__(self, workspace=None):
+        if workspace is None:
+            # Default to meta-orchestrator/sessions relative to this script
+            base_dir = Path(__file__).resolve().parent.parent
+            workspace = base_dir / "sessions"
+        self.workspace = Path(workspace)
+        self.workspace.mkdir(parents=True, exist_ok=True)
+        
+        # Initialize RAG Engine for ML-driven context gathering
+        try:
+            self.rag = RAGEngine()
+        except Exception as e:
+            print(f"Warning: Could not initialize RAGEngine: {e}")
+            self.rag = None
+
+    def _gather_ml_context(self, prompt, k=5):
+        """ML-driven intent analysis and context retrieval"""
+        if not self.rag:
+            return ""
+            
+        print(f"🧠 ML-Modell analysiert Intent: '{prompt}'...")
+        try:
+            # Search for more items than k, because we might filter some out
+            raw_results = self.rag.search(prompt, k=k*3)
+        except Exception as e:
+            print(f"  Fehler bei der RAG-Suche: {e}")
+            return ""
+        
+        # Filter out generated prompt files to avoid loops
+        results = []
+        for res in raw_results:
+            if "/sessions/" not in res['path']:
+                results.append(res)
+            if len(results) >= k:
+                break
+                
+        if not results:
+            print("  Keine relevanten Pfade gefunden.")
+            return ""
+            
+        print(f"  Automatisch {len(results)} relevante Index-Pfade gefunden.")
+        
+        context_blocks = []
+        for i, res in enumerate(results, 1):
+            path = res['path']
+            similarity = res['similarity']
+            content = res['content']
+            
+            print(f"  - {path} (Relevanz: {similarity:.2f})")
+            
+            # Create formatted context block
+            context_blocks.append(f"--- Datei: {path} (Relevanz: {similarity:.2f}) ---\n{content}\n")
+            
+        return "\n".join(context_blocks)
+
+    def create_branch(self, name, prompt, parent_session=None, skip_context=False):
+        """Create new branch session"""
+        # Generate unique session ID
+        timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+        unique_str = f"{name}{timestamp}"
+        session_id = hashlib.md5(unique_str.encode()).hexdigest()[:8]
+        
+        session_dir = self.workspace / f"{name}_{session_id}"
+        session_dir.mkdir(exist_ok=True)
+
+        # ML-gesteuerte Kontext-Anreicherung (Intent -> RAG -> Prompt)
+        final_prompt = prompt
+        retrieved_context = ""
+        
+        if not skip_context:
+            retrieved_context = self._gather_ml_context(prompt)
+            if retrieved_context:
+                final_prompt = (
+                    f"USER INTENT / PROMPT:\n{prompt}\n\n"
+                    f"==================================================\n"
+                    f"AUTOMATISCH EINGEBETTETER KONTEXT (ML-gesteuert):\n"
+                    f"==================================================\n"
+                    f"{retrieved_context}\n"
+                    f"==================================================\n\n"
+                    f"Bitte beachte den obigen Kontext für deine Antwort."
+                )
+                print("✓ Kontext DIREKT in Prompt eingebettet.")
+
+        # Metadata
+        metadata = {
+            'id': session_id,
+            'name': name,
+            'created_at': datetime.now().isoformat(),
+            'parent': parent_session,
+            'status': 'created',
+            'original_prompt': prompt,
+            'has_ml_context': bool(retrieved_context)
+        }
+        
+        with open(session_dir / 'metadata.json', 'w') as f:
+            json.dump(metadata, f, indent=2)
+
+        # Prompt file
+        with open(session_dir / 'prompt.txt', 'w') as f:
+            f.write(final_prompt)
+
+        print(f"✓ Created session: {session_id} ({name})")
+        print(f"  Directory: {session_dir}")
+        return session_id, session_dir
+
+    def find_session_dir(self, session_id):
+        """Find session directory by ID"""
+        for path in self.workspace.glob(f"*_{session_id}"):
+            if path.is_dir():
+                return path
+        return None
+
+    def start_session(self, session_id):
+        """Start session in tmux"""
+        # Find session directory
+        session_dir = self.find_session_dir(session_id)
+        if not session_dir:
+            print(f"✗ Session not found: {session_id}")
+            return False
+
+        # Read metadata
+        try:
+            with open(session_dir / 'metadata.json', 'r') as f:
+                metadata = json.load(f)
+            with open(session_dir / 'prompt.txt', 'r') as f:
+                prompt = f.read()
+        except Exception as e:
+            print(f"Error reading session data: {e}")
+            return False
+
+        # Tmux session name
+        tmux_name = f"session-{session_id}"
+        
+        # Check if tmux is installed
+        if shutil.which("tmux") is None:
+            print("Error: tmux is not installed. Please install tmux to run sessions.")
+            return False
+
+        try:
+            # Create tmux session detached
+            subprocess.run([
+                'tmux', 'new-session', '-d', '-s', tmux_name, '-c', str(session_dir)
+            ], check=True)
+
+            # Send command
+            subprocess.run(['tmux', 'send-keys', '-t', tmux_name, f'echo "Session: {metadata["name"]}"', 'Enter'])
+            # Here we would normally start the actual agent loop. For now, just echo.
+            subprocess.run(['tmux', 'send-keys', '-t', tmux_name, f'echo "Starting agent with prompt: {prompt}"', 'Enter'])
+            
+            # Update metadata
+            metadata['status'] = 'running'
+            metadata['tmux_session'] = tmux_name
+            metadata['started_at'] = datetime.now().isoformat()
+            
+            with open(session_dir / 'metadata.json', 'w') as f:
+                json.dump(metadata, f, indent=2)
+
+            print(f"✓ Started session {session_id}")
+            print(f"  Attach with: tmux attach -t {tmux_name}")
+            return True
+        except subprocess.CalledProcessError as e:
+            print(f"Error starting tmux: {e}")
+            return False
+
+    def list_sessions(self):
+        """List all sessions"""
+        sessions = []
+        for session_dir in sorted(self.workspace.glob("*_*")):
+            meta_path = session_dir / 'metadata.json'
+            if meta_path.exists():
+                try:
+                    with open(meta_path, 'r') as f:
+                        metadata = json.load(f)
+                    sessions.append(metadata)
+                except:
+                    pass
+        return sessions
+
+def main():
+    """CLI Interface"""
+    if len(sys.argv) < 2:
+        print("""
+        Usage:
+          session_manager.py create <name> <prompt> [--no-context]
+          session_manager.py start <session_id>
+          session_manager.py list
+        """)
+        return
+
+    mgr = SessionManager()
+    command = sys.argv[1]
+
+    if command == 'create':
+        if len(sys.argv) < 4:
+            print("Error: create needs name and prompt")
+            return
+        name = sys.argv[2]
+        
+        # Check for flags
+        skip_context = '--no-context' in sys.argv
+        args = [arg for arg in sys.argv[3:] if arg != '--no-context']
+        prompt = ' '.join(args)
+        
+        session_id, _ = mgr.create_branch(name, prompt, skip_context=skip_context)
+        print(f"\nNext: python session_manager.py start {session_id}")
+
+    elif command == 'start':
+        if len(sys.argv) < 3:
+            print("Error: start needs session_id")
+            return
+        session_id = sys.argv[2]
+        mgr.start_session(session_id)
+
+    elif command == 'list':
+        sessions = mgr.list_sessions()
+        print(f"\n📋 Sessions ({len(sessions)}):\n")
+        for s in sessions:
+            status = s.get('status', 'unknown')
+            ml_ctx = s.get('has_ml_context', False)
+            ctx_mark = "🧠" if ml_ctx else "📝"
+            print(f"[{status}] {s['id']} - {s['name']} {ctx_mark}")
+        print()
+
+    else:
+        print(f"Unknown command: {command}")
+
+if __name__ == '__main__':
+    main()
