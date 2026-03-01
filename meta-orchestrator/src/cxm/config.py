@@ -19,6 +19,7 @@ class Config:
         'workspace': str(Path.home() / ".cxm" / "workspace"),
         'gemini_chats_dir': str(Path.home() / ".gemini" / "tmp" / "partner" / "chats"),
         'model': 'all-MiniLM-L6-v2',
+        'language': 'en',
         'index_extensions': [
             '.py', '.js', '.ts', '.md', '.txt',
             '.rs', '.go', '.java', '.c', '.cpp', '.h'
