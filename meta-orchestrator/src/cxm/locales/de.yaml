@@ -1,0 +1,38 @@
+app:
+  name: "CXM (ContextMachine)"
+  description: "Der Kontext-Orchestrator für KI"
+
+cli:
+  init:
+    welcome: "Willkommen bei CXM (ContextMachine)!"
+    setup_done: "Initialisierung abgeschlossen."
+    workspace_created: "Workspace erstellt in"
+    config_created: "Konfiguration erstellt in"
+    next_steps: "Nächste Schritte"
+    index_hint: "1. Indexiere dein Projekt: 'cxm index'"
+    ask_hint: "2. Stelle deine erste Frage: 'cxm ask \"Dein Problem\"'"
+  ask:
+    analyzing: "Analysiere Intent und sammle Kontext..."
+    intent_found: "Erkannter Intent"
+    inference: "Automatisch erkannt (Context Inference)"
+    completeness: "Prompt-Vollständigkeit"
+    critical_gaps: "Fehlende wichtige Infos (Critical Gaps)"
+    optional_ask: "Möchtest du noch optionale Details angeben?"
+    refined_title: "Verfeinerter Zwischen-Prompt"
+    rag_confirm: "Soll dieser Prompt nun in der RAG-Engine angereichert werden?"
+    searching_rag: "Suche passende Code-Kontexte im RAG-Index..."
+    final_title: "GEREINIGTER MEISTERPROMPT"
+    saved_at: "Gespeichert in"
+    copy_hint: "Du kannst den Text zwischen den Linien nun einfach kopieren."
+
+intents:
+  code_optimization:
+    target: "Welche Funktion/Datei soll optimiert werden?"
+    current_perf: "Wie langsam ist es aktuell?"
+    goal_perf: "Was wäre akzeptable Performance?"
+  bug_fixing:
+    error_message: "Was ist die Fehlermeldung?"
+    reproduction: "Wie reproduziert man den Fehler?"
+    expected: "Was sollte stattdessen passieren?"
+  general:
+    goal: "Was genau willst du erreichen?"
