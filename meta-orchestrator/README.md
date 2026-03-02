@@ -16,21 +16,28 @@ CXM is a powerful local tool designed to bridge the gap between vague user inten
 
 ### 📋 Prerequisites
 
-Ensure Python >= 3.8 is installed. The following packages are required:
-- `sentence-transformers` (Semantic embeddings)
-- `faiss-cpu` (Vector index)
-- `rank-bm25` (BM25 retrieval)
-- `scikit-learn`, `numpy`, `pyyaml`, `tqdm`, `rich`
+Ensure Python >= 3.8 is installed.
 
-### 🔧 Steps
+### 🔧 Steps (Fedora)
 
-1. Clone the repository:
+1. Install system dependencies:
+   ```bash
+   sudo dnf install git python3
+   ```
+
+2. Clone the repository:
    ```bash
    git clone https://github.com/Joeavaib/partner.git
    cd partner
    ```
 
-2. Install the package in editable mode:
+3. Create and activate a virtual environment:
+   ```bash
+   python3 -m venv partnerenv
+   source partnerenv/bin/activate
+   ```
+
+4. Install the package in editable mode:
    ```bash
    pip install -e meta-orchestrator
    ```
