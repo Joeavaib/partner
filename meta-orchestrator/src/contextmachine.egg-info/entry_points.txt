@@ -1,3 +1,0 @@
-[console_scripts]
-cxm = cxm.cli:main
-cxmd = cxm.dashboard:main

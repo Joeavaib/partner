@@ -1,2 +1,0 @@
-[console_scripts]
-clawd = meta_clawd.cli:main

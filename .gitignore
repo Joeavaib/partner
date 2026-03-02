@@ -10,3 +10,18 @@ meta-orchestrator/tools/__pycache__/
 .DS_Store
 .env
 current_task_prompt.txt
+
+# Virtual Environments
+bin/
+include/
+lib/
+lib64/
+share/
+pyvenv.cfg
+partnerenv/
+.venv/
+env/
+venv/
+node_modules/
+dist/
+build/

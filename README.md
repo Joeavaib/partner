@@ -1,22 +1,3 @@
-Metadata-Version: 2.4
-Name: contextmachine
-Version: 0.1.0
-Summary: CXM - The Developer's Context Machine for AI Orchestration
-Author-email: Joe <joe@example.com>
-Requires-Python: >=3.8
-Description-Content-Type: text/markdown
-License-File: LICENSE
-Requires-Dist: sentence-transformers>=2.2.0
-Requires-Dist: faiss-cpu>=1.7.4
-Requires-Dist: numpy>=1.24.0
-Requires-Dist: scikit-learn>=1.3.0
-Requires-Dist: rank-bm25>=0.2.2
-Requires-Dist: pyyaml>=6.0
-Requires-Dist: tqdm>=4.65.0
-Requires-Dist: rich>=13.0.0
-Requires-Dist: pyperclip>=1.8.2
-Dynamic: license-file
-
 # 🏗️ CXM (ContextMachine)
 
 **The Developer's Context Machine for AI Orchestration.**
@@ -31,35 +12,39 @@ CXM is a powerful local tool designed to bridge the gap between vague user inten
 - **🔄 Session Awareness**: Plugs into your active Gemini CLI chat history to maintain continuity.
 - **🛡️ 100% Local**: Your code index and logic stay on your machine.
 
-## 🚀 Installation
+## 🚀 Quick Start
 
-### 📋 Prerequisites
+### 📋 Installation
 
-Ensure Python >= 3.8 is installed.
+CXM is designed for **Linux** and **Windows**.
 
-### 🔧 Steps (Fedora)
+**1. Clone the repository:**
+```bash
+git clone https://github.com/Joeavaib/partner.git
+cd partner
+```
 
-1. Install system dependencies:
-   ```bash
-   sudo dnf install git python3
-   ```
+**2. Automated Setup (Linux only):**
+```bash
+chmod +x install.sh
+./install.sh
+```
 
-2. Clone the repository:
-   ```bash
-   git clone https://github.com/Joeavaib/partner.git
-   cd partner
-   ```
+**3. Manual Setup (Linux):**
+```bash
+python3 -m venv partnerenv
+source partnerenv/bin/activate
+pip install -e meta-orchestrator
+```
 
-3. Create and activate a virtual environment:
-   ```bash
-   python3 -m venv partnerenv
-   source partnerenv/bin/activate
-   ```
+**4. Manual Setup (Windows):**
+```powershell
+python -m venv partnerenv
+.\partnerenv\Scripts\Activate.ps1
+pip install -e meta-orchestrator
+```
 
-4. Install the package in editable mode:
-   ```bash
-   pip install -e meta-orchestrator
-   ```
+> **Detailed Installation Guide**: For system-specific prerequisites like `xclip` or FAISS build tools, please refer to our **[INSTALL.md](./INSTALL.md)**.
 
 ## 🛠️ Usage
 
