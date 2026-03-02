@@ -30,3 +30,6 @@ cxmd = "cxm.dashboard:main"
 [tool.setuptools.packages.find]
 where = ["src"]
 include = ["cxm*"]
+
+[tool.setuptools.package-data]
+"cxm.locales" = ["*.yaml"]

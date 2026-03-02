@@ -4,66 +4,51 @@
 
 CXM is a powerful local tool designed to bridge the gap between vague user intent and high-quality AI prompts. It automatically gathers system context (Git, local files, active CLI sessions) and uses RAG (Retrieval-Augmented Generation) to inject relevant code snippets into your prompts.
 
-## ✨ Features
+## ✨ Features (Secret Weapons)
 
 - **🧠 ML-Driven Intent Analysis**: Automatically detects if you're trying to fix a bug, optimize code, or generate a new feature.
-- **🔍 Hybrid RAG**: Combines semantic search (embeddings) and keyword search (BM25) to find the most relevant parts of your codebase.
-- **💬 Interactive Prompt Refinement**: If your request is too vague, the CLI will ask clarifying questions to build a perfect prompt.
-- **🔄 Session Awareness**: Plugs into your active Gemini CLI chat history to maintain continuity.
-- **🛡️ 100% Local**: Your code index and logic stay on your machine.
+- **🔍 Optimized Hybrid RAG**: Combines semantic search (embeddings) and keyword search (BM25). Lazy loading ensures high performance even with large codebases.
+- **💬 Interactive Prompt Refinement**: The CLI/Dashboard asks clarifying questions to build a perfect prompt.
+- **🌍 Full I18n Support**: Switch between German and English in the Dashboard.
+- **📋 Automatic Clipboard Sync**: Generated prompts are automatically copied to your clipboard—no manual terminal copying needed.
+- **🛡️ 100% Local & Private**: Your code index and logic stay on your machine. No cloud tracking.
 
-## 🚀 Quick Start
+## 🚀 Quick Start (One-Click)
 
-### 📋 Installation
+### 📋 Installation (Linux/macOS)
 
-CXM is designed for **Linux** and **Windows**.
-
-**1. Clone the repository:**
+**1. Clone and Setup:**
 ```bash
 git clone https://github.com/Joeavaib/partner.git
-cd partner
+cd partner/partner
+chmod +x install.sh
+./install.sh
 ```
 
-**2. Setup environment (Linux):**
+**2. Launch Dashboard:**
 ```bash
-python3 -m venv partnerenv
 source partnerenv/bin/activate
-pip install -e meta-orchestrator
+cxmd
 ```
-
-**3. Setup environment (Windows):**
-```powershell
-python -m venv partnerenv
-.\partnerenv\Scripts\Activate.ps1
-pip install -e meta-orchestrator
-```
-
-> **Detailed Installation Guide**: For system-specific prerequisites like `xclip` or FAISS build tools, please refer to our **[INSTALL.md](./INSTALL.md)**.
 
 ## 🛠️ Usage
 
-### 1. Index your project
-Before starting, create a local knowledge base of your current project:
+### Dashboard (Recommended)
+Launch the interactive TUI (Terminal User Interface) to manage everything:
 ```bash
-cxm index
+cxmd
 ```
 
-### 2. Ask a question
-Use the interactive builder to generate an optimized prompt:
-```bash
-cxm ask "mach meine funktion in app.py schneller"
-```
-The tool will analyze your intent, ask missing questions, and output a fully-formed prompt that you can paste into Gemini.
-
-### 3. Check Context
-See what CXM currently knows about your environment:
-```bash
-cxm ctx
-```
+### CLI Commands
+- **Index your project**: `cxm index`
+- **Ask a question**: `cxm ask "optimize my route handler in api.py"`
+- **Search Knowledge**: `cxm search "your query"`
+- **Check Context**: `cxm ctx`
 
 ## 📂 Configuration
 
-You can customize paths and behavior in `~/.cxm/config.yaml` or a local `cxm.yaml`.
+Customize paths and behavior in `~/.cxm/config.yaml`.
+Logs are stored at `~/.cxm/logs/cxm.log`.
 
 ## 📄 License
 

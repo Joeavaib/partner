@@ -25,6 +25,51 @@ cli:
     saved_at: "Saved in"
     copy_hint: "You can now simply copy the text between the lines."
 
+dashboard:
+  menu_title: "[b]Main Menu[/b]"
+  ctx: "Local Changes (git diff)"
+  rag_search: "Search Knowledge (cxm-rag search)"
+  rag_index: "Index File/Folder (cxm-rag index)"
+  sessions: "Manage Sessions (cxm-session)"
+  language: "Language (English)"
+  prompt_builder: "[bold yellow]Build New Prompt (Prompt Builder)[/bold yellow]"
+  exit: "Exit"
+  choose: "Choose an action"
+  bye: "Goodbye!"
+  back: "Press Enter to return..."
+  search_query: "What are you looking for?"
+  indexing: "Indexing..."
+  path_prompt: "Path (e.g. '.' for this folder or 'app.py')"
+  session_action: "(c)reate, (s)tart or (Enter) back"
+  status:
+    gathering_ctx: "Gathering context..."
+    searching_rag: "Searching long-term memory..."
+    building_prompt: "Gathering context and building prompt..."
+  context:
+    title: "Current Context"
+    branch: "Branch"
+    changes: "Changes"
+    recent_edits: "Recent Edits"
+    files: "files"
+  settings:
+    lang_title: "Language Settings"
+    lang_select: "Select language"
+    lang_current: "current"
+    lang_set: "Language set to"
+  sessions_ui:
+    title: "Active Sessions"
+    name: "Session Name"
+    plan_prompt: "Planning Prompt"
+  builder:
+    title: "PROMPT BUILDER"
+    subtitle: "Building a high-context prompt for your app."
+    goal_q: "1. What is your goal? (e.g. 'Create a new route for user logins')"
+    focus_q: "2. Which file(s) are mainly affected? (e.g. 'app.py' or 'auth.js')"
+    rag_info: "### Relevant knowledge from RAG engine:"
+    finished: "Finished Prompt"
+    saved: "Prompt also saved at:"
+    copy_msg: "You can now copy this text and paste it into our Gemini chat window!"
+
 intents:
   code_optimization:
     target: "Which function/file should be optimized?"

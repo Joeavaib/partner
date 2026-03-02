@@ -12,6 +12,8 @@ import faiss
 import numpy as np
 from tqdm import tqdm
 
+from cxm.utils.logger import logger
+
 class RAGEngine:
     """
     Core indexing and retrieval
@@ -20,6 +22,7 @@ class RAGEngine:
     - Vector storage via FAISS
     - Metadata via JSON (no external DB needed)
     - Incremental indexing with change detection
+    - Optimized: Full content is not stored in metadata.json to save space
     """
     
     def __init__(self, workspace: Path, model_name: str = 'all-MiniLM-L6-v2'):
@@ -34,14 +37,21 @@ class RAGEngine:
         self.metadata_path = self.workspace / "metadata.json"
         
         # Load model
+        logger.info(f"Initializing RAGEngine with model: {model_name}")
         self.model = SentenceTransformer(model_name)
         self.embedding_dim = self.model.get_sentence_embedding_dimension()
         
         # Load or create index
         if self.index_path.exists() and self.metadata_path.exists():
-            self.index = faiss.read_index(str(self.index_path))
-            with open(self.metadata_path) as f:
-                self.metadata = json.load(f)
+            try:
+                self.index = faiss.read_index(str(self.index_path))
+                with open(self.metadata_path) as f:
+                    self.metadata = json.load(f)
+                logger.info(f"Loaded existing index with {len(self.metadata)} documents.")
+            except Exception as e:
+                logger.error(f"Failed to load index: {e}. Creating new one.")
+                self.index = faiss.IndexFlatL2(self.embedding_dim)
+                self.metadata = []
         else:
             self.index = faiss.IndexFlatL2(self.embedding_dim)
             self.metadata = []
@@ -57,10 +67,19 @@ class RAGEngine:
             for m in self.metadata
         )
     
+    def _get_content(self, metadata: Dict) -> str:
+        """Retrieve full content from disk if possible, else return stored preview"""
+        path = Path(metadata.get('path', ''))
+        if path.exists() and path.is_file():
+            try:
+                return path.read_text(encoding='utf-8', errors='ignore')
+            except Exception:
+                pass
+        return metadata.get('full_content', metadata.get('content_preview', ''))
+
     def index_file(self, file_path: Path, force: bool = False) -> bool:
         """
         Index single file
-        
         Returns True if indexed, False if skipped
         """
         file_path = Path(file_path).resolve()
@@ -80,7 +99,7 @@ class RAGEngine:
             embedding = self.model.encode([content])[0]
             self.index.add(np.array([embedding], dtype=np.float32))
             
-            # Store metadata
+            # Store metadata (WITHOUT full_content for file-based docs)
             self.metadata.append({
                 'id': len(self.metadata),
                 'path': str(file_path),
@@ -89,12 +108,13 @@ class RAGEngine:
                 'size': len(content),
                 'hash': self._file_hash(file_path),
                 'indexed_at': datetime.now().isoformat(),
-                'content_preview': content[:500],
-                'full_content': content,
+                'content_preview': content[:1000], # Keep a larger preview but not all
+                # 'full_content': content, <-- REMOVED for space optimization
             })
             
             return True
-        except Exception:
+        except Exception as e:
+            logger.error(f"Error indexing {file_path}: {e}")
             return False
     
     def index_directory(
@@ -110,11 +130,13 @@ class RAGEngine:
         if not directory.exists():
             return {'indexed': 0, 'skipped': 0, 'errors': 0}
         
+        logger.info(f"Indexing directory: {directory}")
+        
         # Collect files
         files = []
         pattern = '**/*' if recursive else '*'
         
-        skip_dirs = {'.git', '__pycache__', 'node_modules', '.venv', 'venv', '.cxm', 'sessions', 'partnerenv', 'knowledge-base'}
+        skip_dirs = {'.git', '__pycache__', 'node_modules', '.venv', 'venv', '.cxm', 'sessions', 'partnerenv', 'knowledge-base', 'build', 'dist'}
         skip_exts = {'.pyc', '.so', '.dylib', '.dll', '.exe', '.bin',
                      '.jpg', '.jpeg', '.png', '.gif', '.pdf', '.zip',
                      '.tar', '.gz', '.whl', '.egg'}
@@ -123,14 +145,21 @@ class RAGEngine:
             if not file_path.is_file():
                 continue
             
-            # Skip hidden/ignored dirs
-            if any(part in skip_dirs for part in file_path.parts):
+            # Skip hidden/ignored dirs and egg-info
+            if any(part in skip_dirs or part.endswith('.egg-info') for part in file_path.parts):
                 continue
             
             if file_path.name.startswith('.'):
                 continue
             
             if file_path.suffix.lower() in skip_exts:
+                continue
+
+            # Skip tiny files (e.g. top_level.txt which is often just one word)
+            try:
+                if file_path.stat().st_size < 10:
+                    continue
+            except:
                 continue
             
             if extensions and file_path.suffix not in extensions:
@@ -151,13 +180,13 @@ class RAGEngine:
                 stats['errors'] += 1
         
         self.save()
+        logger.info(f"Indexing complete. Stats: {stats}")
         return stats
     
     def index_text(self, content: str, source: str = "manual", metadata: Dict = None) -> int:
         """
         Index arbitrary text (conversations, notes, etc.)
-        
-        Returns document ID
+        Returns document ID. Here we KEEP the content as it has no file source.
         """
         if not content.strip():
             return -1
@@ -175,8 +204,8 @@ class RAGEngine:
             'size': len(content),
             'hash': hashlib.md5(content.encode()).hexdigest(),
             'indexed_at': datetime.now().isoformat(),
-            'content_preview': content[:500],
-            'full_content': content,
+            'content_preview': content[:1000],
+            'full_content': content, # Keep for non-file based texts
         }
         
         if metadata:
@@ -218,27 +247,36 @@ class RAGEngine:
             result = self.metadata[idx].copy()
             result['similarity'] = similarity
             result['distance'] = float(dist)
+            
+            # Lazy load full content for search results
+            result['full_content'] = self._get_content(result)
+            
             results.append(result)
         
         return results
     
     def get_document(self, doc_id: int) -> Optional[Dict]:
-        """Get document by ID"""
+        """Get document by ID with content resolution"""
         if 0 <= doc_id < len(self.metadata):
-            return self.metadata[doc_id]
+            doc = self.metadata[doc_id].copy()
+            doc['full_content'] = self._get_content(doc)
+            return doc
         return None
     
     def remove_document(self, doc_id: int):
-        """Mark document as removed (FAISS doesn't support true deletion)"""
+        """Mark document as removed"""
         if 0 <= doc_id < len(self.metadata):
             self.metadata[doc_id]['_deleted'] = True
             self.save()
     
     def save(self):
         """Persist to disk"""
-        faiss.write_index(self.index, str(self.index_path))
-        with open(self.metadata_path, 'w') as f:
-            json.dump(self.metadata, f)
+        try:
+            faiss.write_index(self.index, str(self.index_path))
+            with open(self.metadata_path, 'w') as f:
+                json.dump(self.metadata, f)
+        except Exception as e:
+            logger.error(f"Failed to save index: {e}")
     
     def stats(self) -> Dict:
         active_docs = [m for m in self.metadata if not m.get('_deleted')]
@@ -258,6 +296,7 @@ class RAGEngine:
     
     def clear(self):
         """Reset entire index"""
+        logger.info("Clearing entire index.")
         self.index = faiss.IndexFlatL2(self.embedding_dim)
         self.metadata = []
         self.save()
