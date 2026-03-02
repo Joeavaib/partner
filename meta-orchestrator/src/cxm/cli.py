@@ -70,6 +70,15 @@ def handle_ask(args):
             return
     
     rag = RAGEngine(workspace)
+    
+    # Auto-indexing for local project if not skipped
+    if not github_url and not project_name and not getattr(args, 'no_index', False):
+        console.print("[dim]Checking for code changes (Incremental Indexing)...[/dim]")
+        # Index current directory. RAG handles change detection via MD5 automatically.
+        stats = rag.index_directory(Path.cwd(), recursive=True)
+        if stats['indexed'] > 0:
+            console.print(f"[dim]Updated index: {stats['indexed']} files changed.[/dim]")
+
     enhancer = PromptEnhancer(rag)
     
     console.print("[dim]Analyzing intent and gathering context...[/dim]")
@@ -177,6 +186,7 @@ def main():
     # ask
     ask_parser = subparsers.add_parser("ask", help="Create an enhanced RAG prompt")
     ask_parser.add_argument("prompt", nargs="+", help="The initial prompt")
+    ask_parser.add_argument("--no-index", action="store_true", help="Skip automatic incremental indexing")
     
     # index
     index_parser = subparsers.add_parser("index", help="Index a directory")

@@ -2,8 +2,11 @@
 
 import subprocess
 import os
+import json
+import glob
 from pathlib import Path
 from typing import Dict, Optional
+from datetime import datetime
 
 
 def run_cmd(cmd: str, timeout: int = 3) -> Optional[str]:
@@ -89,9 +92,6 @@ def gather_system_context() -> Dict:
     }
 
 
-import json
-import glob
-
 def gather_gemini_cli_context() -> Optional[Dict]:
     """Gather the active Gemini CLI session context if available"""
     try:
@@ -138,6 +138,74 @@ def gather_gemini_cli_context() -> Optional[Dict]:
     except Exception as e:
         return {'error': str(e)}
 
+def gather_claudecode_context() -> Optional[Dict]:
+    """Gather the Claude Code CLI session context if available"""
+    try:
+        from ..config import Config
+        config = Config()
+        
+        base_dir = Path(config.get('claudecode_dir'))
+        projects_dir = base_dir / "projects"
+        if not projects_dir.exists():
+            return None
+            
+        # Claude uses project-specific folders. Try to find one matching current CWD.
+        cwd_str = str(Path.cwd()).replace("/", "-")
+        # Find project directories that match our current path
+        project_folders = [d for d in projects_dir.iterdir() if d.is_dir() and cwd_str in d.name]
+        
+        if not project_folders:
+            # Fallback: look for any very recently modified projects
+            project_folders = sorted(
+                [d for d in projects_dir.iterdir() if d.is_dir()],
+                key=os.path.getmtime,
+                reverse=True
+            )[:1]
+            
+        if not project_folders:
+            return None
+            
+        # Get newest session from the chosen project
+        target_project = project_folders[0]
+        session_files = list(target_project.glob("*.jsonl"))
+        if not session_files:
+            return None
+            
+        latest_session = max(session_files, key=os.path.getmtime)
+        
+        recent_prompts = []
+        with open(latest_session, 'r', encoding='utf-8') as f:
+            # Read backwards or just last lines since it's JSONL
+            lines = f.readlines()
+            # In JSONL, we want user messages. 
+            # Looking for typical Claude JSON structure in those lines
+            for line in reversed(lines):
+                try:
+                    data = json.loads(line)
+                    # Extract user messages (structure might vary slightly depending on version)
+                    # Assuming standard message format or similar to what we saw in search
+                    if data.get('role') == 'user' or (data.get('type') == 'message' and data.get('role') == 'user'):
+                        content = data.get('content', '')
+                        if isinstance(content, list):
+                            text = "".join([c.get('text', '') for c in content if isinstance(c, dict)])
+                        else:
+                            text = str(content)
+                            
+                        if text:
+                            recent_prompts.insert(0, text[:200] + ('...' if len(text) > 200 else ''))
+                            if len(recent_prompts) >= 2:
+                                break
+                except:
+                    continue
+        
+        return {
+            'project': target_project.name,
+            'last_updated': datetime.fromtimestamp(latest_session.stat().st_mtime).isoformat(),
+            'recent_prompts': recent_prompts
+        }
+    except Exception as e:
+        return {'error': str(e)}
+
 def gather_all(cwd: Path = None) -> Dict:
     """Gather complete context"""
     
@@ -150,6 +218,7 @@ def gather_all(cwd: Path = None) -> Dict:
         'shell': gather_shell_context(),
         'system': gather_system_context(),
         'gemini_cli': gather_gemini_cli_context(),
+        'claudecode': gather_claudecode_context(),
     }
 
 def main():

@@ -18,6 +18,7 @@ class Config:
     DEFAULT_CONFIG = {
         'workspace': str(Path.home() / ".cxm" / "workspace"),
         'gemini_chats_dir': str(Path.home() / ".gemini" / "tmp" / "partner" / "chats"),
+        'claudecode_dir': str(Path.home() / ".claude"),
         'model': 'all-MiniLM-L6-v2',
         'language': 'en',
         'index_extensions': [
