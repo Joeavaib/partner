@@ -6,6 +6,7 @@ meta-orchestrator/src/meta_clawd.egg-info/
 meta-orchestrator/__pycache__/
 meta-orchestrator/src/**/__pycache__/
 meta-orchestrator/tools/__pycache__/
+meta-orchestrator/visions.md
 *.pyc
 .DS_Store
 .env
