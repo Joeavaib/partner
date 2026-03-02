@@ -41,12 +41,12 @@ class SessionManager:
         if not self.rag:
             return ""
             
-        print(f"🧠 ML-Modell analysiert Intent: '{prompt}'...")
+        print(f"🧠 ML Model analyzing intent: '{prompt}'...")
         try:
             # Search for more items than k, because we might filter some out
             raw_results = self.rag.search(prompt, k=k*3)
         except Exception as e:
-            print(f"  Fehler bei der RAG-Suche: {e}")
+            print(f"  Error during RAG search: {e}")
             return ""
         
         # Filter out generated prompt files to avoid loops
@@ -58,10 +58,10 @@ class SessionManager:
                 break
                 
         if not results:
-            print("  Keine relevanten Pfade gefunden.")
+            print("  No relevant paths found.")
             return ""
             
-        print(f"  Automatisch {len(results)} relevante Index-Pfade gefunden.")
+        print(f"  Automatically found {len(results)} relevant index paths.")
         
         context_blocks = []
         for i, res in enumerate(results, 1):
@@ -69,10 +69,10 @@ class SessionManager:
             similarity = res['similarity']
             content = res['content']
             
-            print(f"  - {path} (Relevanz: {similarity:.2f})")
+            print(f"  - {path} (Relevance: {similarity:.2f})")
             
             # Create formatted context block
-            context_blocks.append(f"--- Datei: {path} (Relevanz: {similarity:.2f}) ---\n{content}\n")
+            context_blocks.append(f"--- File: {path} (Relevance: {similarity:.2f}) ---\n{content}\n")
             
         return "\n".join(context_blocks)
 
@@ -86,7 +86,7 @@ class SessionManager:
         session_dir = self.workspace / f"{name}_{session_id}"
         session_dir.mkdir(exist_ok=True)
 
-        # ML-gesteuerte Kontext-Anreicherung (Intent -> RAG -> Prompt)
+        # ML-driven context enrichment (Intent -> RAG -> Prompt)
         final_prompt = prompt
         retrieved_context = ""
         
@@ -96,13 +96,13 @@ class SessionManager:
                 final_prompt = (
                     f"USER INTENT / PROMPT:\n{prompt}\n\n"
                     f"==================================================\n"
-                    f"AUTOMATISCH EINGEBETTETER KONTEXT (ML-gesteuert):\n"
+                    f"AUTOMATICALLY EMBEDDED CONTEXT (ML-driven):\n"
                     f"==================================================\n"
                     f"{retrieved_context}\n"
                     f"==================================================\n\n"
-                    f"Bitte beachte den obigen Kontext für deine Antwort."
+                    f"Please consider the above context for your response."
                 )
-                print("✓ Kontext DIREKT in Prompt eingebettet.")
+                print("✓ Context embedded DIRECTLY into prompt.")
 
         # Metadata
         metadata = {

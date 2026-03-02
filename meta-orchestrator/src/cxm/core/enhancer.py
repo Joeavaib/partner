@@ -171,25 +171,25 @@ class PromptEnhancer:
 
     def interactive_enhance(self, prompt: str):
         """
-        Interaktive Version: Fragt User bei Lücken
+        Interactive version: Asks user for missing info
         
         Returns:
-            Generator der Fragen stellt und am Ende
-            den fertigen Prompt liefert
+            Generator that asks questions and finally
+            provides the finished prompt
         """
         
-        # 1. Analyse
+        # 1. Analysis
         analysis = self.intent_analyzer.analyze(prompt)
         system_context = gather_all()
         
-        # 2. Lücken finden
+        # 2. Find gaps
         gaps = self.refiner.analyze_gaps(
             prompt=prompt,
             intent=analysis['intent'],
             auto_context=system_context,
         )
         
-        # 3. Result objekt das wir füllen
+        # 3. Result object to fill
         answers = {}
         
         # 4. Yield questions

@@ -12,59 +12,59 @@ import re
 
 class PromptRefiner:
     """
-    Wandelt vage Prompts in präzise um durch:
+    Turns vague prompts into precise ones through:
     
-    1. Context Inference (automatisch Kontext erraten)
-    2. Gap Detection (fehlende Info erkennen)
-    3. Clarifying Questions (gezielt nachfragen)
-    4. Progressive Refinement (iterativ verbessern)
+    1. Context Inference (automatically guessing context)
+    2. Gap Detection (identifying missing information)
+    3. Clarifying Questions (targeted inquiries)
+    4. Progressive Refinement (iterative improvement)
     """
     
-    # Was eine KI typischerweise braucht, pro Intent
+    # What an AI typically needs per intent
     REQUIRED_CONTEXT = {
         'code_optimization': {
             'must_have': [
-                ('target', 'Welche Funktion/Datei soll optimiert werden?'),
-                ('current_performance', 'Wie langsam ist es aktuell?'),
-                ('goal_performance', 'Was wäre akzeptable Performance?'),
+                ('target', 'Which function/file should be optimized?'),
+                ('current_performance', 'How slow is it currently?'),
+                ('goal_performance', 'What would be acceptable performance?'),
             ],
             'nice_to_have': [
-                ('constraints', 'Gibt es Einschränkungen? (Memory, CPU, Kompatibilität)'),
-                ('tried_before', 'Was hast du schon probiert?'),
-                ('measurement', 'Wie misst du Performance?'),
+                ('constraints', 'Are there any constraints? (Memory, CPU, compatibility)'),
+                ('tried_before', 'What have you tried already?'),
+                ('measurement', 'How do you measure performance?'),
             ],
         },
         'bug_fixing': {
             'must_have': [
-                ('error_message', 'Was ist die Fehlermeldung?'),
-                ('reproduction', 'Wie reproduziert man den Fehler?'),
-                ('expected', 'Was sollte stattdessen passieren?'),
+                ('error_message', 'What is the error message?'),
+                ('reproduction', 'How can the error be reproduced?'),
+                ('expected', 'What should happen instead?'),
             ],
             'nice_to_have': [
-                ('when_started', 'Seit wann tritt der Fehler auf?'),
-                ('what_changed', 'Was wurde zuletzt geändert?'),
-                ('environment', 'Welche Umgebung? (OS, Python-Version, etc.)'),
+                ('when_started', 'When did the error first occur?'),
+                ('what_changed', 'What was changed recently?'),
+                ('environment', 'Which environment? (OS, Python version, etc.)'),
             ],
         },
         'code_generation': {
             'must_have': [
-                ('what', 'Was genau soll generiert werden?'),
-                ('language', 'Welche Sprache/Framework?'),
-                ('behavior', 'Wie soll es sich verhalten?'),
+                ('what', 'What exactly should be generated?'),
+                ('language', 'Which language/framework?'),
+                ('behavior', 'How should it behave?'),
             ],
             'nice_to_have': [
-                ('style', 'Code-Stil-Präferenzen?'),
-                ('integration', 'Wo wird es eingebaut?'),
-                ('tests', 'Sollen Tests mit generiert werden?'),
+                ('style', 'Code style preferences?'),
+                ('integration', 'Where will it be integrated?'),
+                ('tests', 'Should tests be generated as well?'),
             ],
         },
         'general': {
             'must_have': [
-                ('goal', 'Was genau willst du erreichen?'),
+                ('goal', 'What exactly do you want to achieve?'),
             ],
             'nice_to_have': [
-                ('context', 'Was ist der Hintergrund?'),
-                ('constraints', 'Gibt es Einschränkungen?'),
+                ('context', 'What is the background?'),
+                ('constraints', 'Are there any constraints?'),
             ],
         },
     }
@@ -72,8 +72,8 @@ class PromptRefiner:
     def __init__(self, context_gatherer=None, rag=None):
         """
         Args:
-            context_gatherer: Automatischer System-Kontext
-            rag: RAG Engine für historischen Kontext
+            context_gatherer: Automatic system context gatherer
+            rag: RAG Engine for historical context
         """
         self.context_gatherer = context_gatherer
         self.rag = rag
@@ -85,15 +85,15 @@ class PromptRefiner:
         auto_context: Dict = None
     ) -> Dict:
         """
-        Analysiert was im Prompt fehlt
+        Analyzes what is missing in the prompt
         
         Returns:
             {
-                'provided': {key: value},      # Was schon da ist
-                'inferred': {key: value},      # Was automatisch erkannt wurde
-                'missing_critical': [(key, question)],  # MUSS beantwortet werden
-                'missing_optional': [(key, question)],  # Wäre hilfreich
-                'completeness': float           # 0-1 wie vollständig
+                'provided': {key: value},      # What is already there
+                'inferred': {key: value},      # What was automatically detected
+                'missing_critical': [(key, question)],  # MUST be answered
+                'missing_optional': [(key, question)],  # Would be helpful
+                'completeness': float           # 0-1 how complete
             }
         """
         
@@ -104,14 +104,14 @@ class PromptRefiner:
         missing_critical = []
         missing_optional = []
         
-        # 1. Check was im Prompt schon steht
+        # 1. Check what is already in the prompt
         provided = self._extract_provided(prompt, intent)
         
-        # 2. Was kann automatisch inferiert werden?
+        # 2. What can be automatically inferred?
         if auto_context:
             inferred = self._infer_from_context(auto_context, intent)
         
-        # 3. Was fehlt noch?
+        # 3. What is still missing?
         all_known = {**provided, **inferred}
         
         for key, question in requirements.get('must_have', []):
@@ -136,12 +136,12 @@ class PromptRefiner:
         }
     
     def _extract_provided(self, prompt: str, intent: str) -> Dict:
-        """Extrahiere was der User schon gesagt hat"""
+        """Extract what the user has already said"""
         
         provided = {}
         prompt_lower = prompt.lower()
         
-        # Dateinamen
+        # File names
         files = re.findall(
             r'\b[\w/.-]+\.(?:py|js|ts|rs|go|md|java|c|cpp|h)\b',
             prompt
@@ -149,12 +149,12 @@ class PromptRefiner:
         if files:
             provided['target'] = files[0]
         
-        # Funktionsnamen
+        # Function names
         funcs = re.findall(r'\b[a-zA-Z_]\w*\(\)', prompt)
         if funcs:
             provided['target'] = funcs[0]
         
-        # Fehlermeldungen
+        # Error messages
         errors = re.findall(
             r'(Error|Exception|Traceback|Failed|TypeError|ValueError'
             r'|KeyError|AttributeError|ImportError|NameError).*',
@@ -163,12 +163,12 @@ class PromptRefiner:
         if errors:
             provided['error_message'] = errors[0]
         
-        # Performance-Zahlen
+        # Performance numbers
         perf = re.findall(r'(\d+\.?\d*)\s*(ms|seconds?|s|minutes?|min)', prompt_lower)
         if perf:
             provided['current_performance'] = f"{perf[0][0]} {perf[0][1]}"
         
-        # Sprache
+        # Language
         langs = re.findall(
             r'\b(python|javascript|typescript|rust|go|java|c\+\+|ruby)\b',
             prompt_lower
@@ -176,7 +176,7 @@ class PromptRefiner:
         if langs:
             provided['language'] = langs[0]
         
-        # "Ich habe schon X probiert"
+        # "I already tried X"
         tried = re.findall(
             r'(?:tried|probiert|versucht|already)\s+(.+?)(?:\.|,|$)',
             prompt_lower
@@ -187,7 +187,7 @@ class PromptRefiner:
         return provided
     
     def _infer_from_context(self, context: Dict, intent: str) -> Dict:
-        """Inferiere fehlende Info aus System-Kontext"""
+        """Infer missing info from system context"""
         
         inferred = {}
         
@@ -195,7 +195,7 @@ class PromptRefiner:
         git = context.get('git')
         if git:
             if git.get('status'):
-                # Welche Dateien geändert?
+                # Which files changed?
                 changed_files = [
                     line.split()[-1]
                     for line in (git['status'] or '').split('\n')
@@ -216,10 +216,10 @@ class PromptRefiner:
         if files.get('recent_edits'):
             edits = files['recent_edits']
             if edits and 'target' not in inferred:
-                # Zuletzt bearbeitete Datei = wahrscheinlich das Ziel
+                # Recently edited file = likely the target
                 inferred['target'] = edits[0]
         
-        # Sprache aus Datei-Endung inferieren
+        # Infer language from file extension
         target = inferred.get('target', '')
         if target.endswith('.py'):
             inferred['language'] = 'python'
@@ -236,14 +236,14 @@ class PromptRefiner:
         max_questions: int = 3
     ) -> List[Dict]:
         """
-        Generiere die wichtigsten Fragen
+        Generate the most important questions
         
         Returns:
             List of {
                 'key': str,
                 'question': str,
                 'priority': 'critical' | 'optional',
-                'suggestions': List[str]  # Mögliche Antworten
+                'suggestions': List[str]  # Possible answers
             }
         """
         
@@ -273,13 +273,13 @@ class PromptRefiner:
         return questions
     
     def _generate_suggestions(self, key: str, gaps: Dict) -> List[str]:
-        """Generiere Vorschläge für Antworten basierend auf Kontext"""
+        """Generate suggestions for answers based on context"""
         
         suggestions = []
         inferred = gaps.get('inferred', {})
         
         if key == 'target':
-            # Schlage Dateien aus Kontext vor
+            # Suggest files from context
             if 'target' in inferred:
                 suggestions.append(inferred['target'])
         
@@ -288,13 +288,13 @@ class PromptRefiner:
                 suggestions.append(inferred['language'])
         
         elif key == 'current_performance':
-            suggestions.extend(['< 1 Sekunde', '1-5 Sekunden', '> 10 Sekunden'])
+            suggestions.extend(['< 1 second', '1-5 seconds', '> 10 seconds'])
         
         elif key == 'goal_performance':
-            suggestions.extend(['So schnell wie möglich', '< 100ms', '< 1 Sekunde'])
+            suggestions.extend(['As fast as possible', '< 100ms', '< 1 second'])
         
         elif key == 'error_message':
-            suggestions.append('(Paste die Fehlermeldung)')
+            suggestions.append('(Paste the error message)')
         
         return suggestions
     
@@ -306,33 +306,33 @@ class PromptRefiner:
         auto_context: Dict = None
     ) -> str:
         """
-        Baue verfeinerten Prompt aus Original + Antworten + Kontext
+        Build refined prompt from original + answers + context
         
         Args:
-            original_prompt: Originaler vager Prompt
-            intent: Erkannter Intent
-            answers: Antworten auf Clarifying Questions {key: answer}
-            auto_context: Automatisch gesammelter Kontext
+            original_prompt: Original vague prompt
+            intent: Detected intent
+            answers: Answers to clarifying questions {key: answer}
+            auto_context: Automatically gathered context
         
         Returns:
-            Verfeinerter Prompt
+            Refined prompt
         """
         
         parts = [original_prompt, ""]
         
-        # Kontext-Abschnitt
+        # Context section
         context_parts = []
         
-        # Automatischer Kontext
+        # Automatic context
         if auto_context:
             inferred = self._infer_from_context(auto_context, intent)
             for key, value in inferred.items():
-                if key not in answers and value and str(value).strip() not in ["./", "n", "none", "nein", "keine", "."]:  
+                if key not in answers and value and str(value).strip() not in ["./", "n", "none", "no", "."]:  
                     context_parts.append(f"- {key}: {value}")
         
-        # User-Antworten
+        # User answers
         for key, answer in answers.items():
-            if answer and answer.strip() and answer.lower() not in ["n", "none", "nein", "keine"]:
+            if answer and answer.strip() and answer.lower() not in ["n", "none", "no"]:
                 context_parts.append(f"- {key}: {answer}")
         
         if context_parts:
@@ -348,9 +348,9 @@ class PromptRefiner:
         auto_context: Dict = None
     ) -> Dict:
         """
-        Automatische Verfeinerung OHNE User-Interaktion
+        Automatic refinement WITHOUT user interaction
         
-        Nutzt nur automatisch verfügbaren Kontext
+        Uses only automatically available context
         
         Returns:
             {
@@ -366,7 +366,7 @@ class PromptRefiner:
         refined = self.refine_prompt(
             original_prompt=prompt,
             intent=intent,
-            answers={},  # Keine manuellen Antworten
+            answers={},  # No manual answers
             auto_context=auto_context,
         )
         

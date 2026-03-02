@@ -19,11 +19,13 @@ dependencies = [
     "rank-bm25>=0.2.2",
     "pyyaml>=6.0",
     "tqdm>=4.65.0",
-    "rich>=13.0.0"
+    "rich>=13.0.0",
+    "pyperclip>=1.8.2"
 ]
 
 [project.scripts]
 cxm = "cxm.cli:main"
+cxmd = "cxm.dashboard:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

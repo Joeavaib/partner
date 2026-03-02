@@ -5,7 +5,7 @@ from datetime import datetime
 
 import numpy as np
 
-# wir versuchen BM25 zu importieren, aber wenn es fehlt, greifen wir nur auf Semantic zurück
+# We try to import BM25, but if it's missing, we fall back to Semantic only
 try:
     from rank_bm25 import BM25Okapi
 except ImportError:

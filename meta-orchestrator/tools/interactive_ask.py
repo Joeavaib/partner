@@ -11,6 +11,7 @@ from cxm.tools.context_gatherer import gather_all
 from rich.console import Console
 from rich.prompt import Prompt, Confirm
 from rich.panel import Panel
+import pyperclip
 
 def main():
     if len(sys.argv) < 2:
@@ -26,39 +27,39 @@ def main():
     rag = RAGEngine(workspace)
     enhancer = PromptEnhancer(rag)
     
-    # 1. Analyse
-    console.print("[dim]Analysiere Intent und sammle Kontext...[/dim]")
+    # 1. Analysis
+    console.print("[dim]Analyzing intent and gathering context...[/dim]")
     analysis = enhancer.intent_analyzer.analyze(prompt)
     system_context = gather_all()
     
-    console.print(f"\n[cyan]Erkannter Intent:[/cyan] {analysis['intent']} ({analysis['confidence']:.0%})")
+    console.print(f"\n[cyan]Detected Intent:[/cyan] {analysis['intent']} ({analysis['confidence']:.0%})")
     
-    # 2. Lücken
+    # 2. Gaps
     gaps = enhancer.refiner.analyze_gaps(
         prompt, analysis['intent'], system_context
     )
     
-    # 3. Zeige was automatisch erkannt wurde
+    # 3. Show what was automatically detected
     if gaps['inferred']:
-        console.print("\n[green]Automatisch erkannt (Context Inference):[/green]")
+        console.print("\n[green]Automatically detected (Context Inference):[/green]")
         for key, value in gaps['inferred'].items():
             console.print(f"  {key}: [dim]{value}[/dim]")
     
     # 4. Completeness
-    console.print(f"\n[yellow]Prompt-Vollständigkeit: {gaps['completeness']:.0%}[/yellow]")
+    console.print(f"\n[yellow]Prompt Completeness: {gaps['completeness']:.0%}[/yellow]")
     
-    # 5. Fragen stellen
+    # 5. Ask questions
     answers = {}
     
     if gaps['missing_critical']:
-        console.print("\n[bold red]Fehlende wichtige Infos (Critical Gaps):[/bold red]\n")
+        console.print("\n[bold red]Critical Gaps (Missing important info):[/bold red]\n")
         
         for key, question in gaps['missing_critical']:
             suggestions = enhancer.refiner._generate_suggestions(key, gaps)
             
             hint = ""
             if suggestions:
-                hint = f" [dim](Vorschläge: {', '.join(suggestions)})[/dim]"
+                hint = f" [dim](Suggestions: {', '.join(suggestions)})[/dim]"
             
             answer = Prompt.ask(f"  [bold]{question}[/bold]{hint}")
             
@@ -66,26 +67,26 @@ def main():
                 answers[key] = answer
     
     if gaps['missing_optional']:
-        if Confirm.ask("\n[dim]Möchtest du noch optionale Details angeben?[/dim]", default=False):
+        if Confirm.ask("\n[dim]Would you like to provide optional details?[/dim]", default=False):
             for key, question in gaps['missing_optional']:
                 answer = Prompt.ask(f"  [bold]{question}[/bold]")
                 if answer.strip():
                     answers[key] = answer
     
-    # 6. Prompt verfeinern
+    # 6. Refine prompt
     refined_prompt = enhancer.refiner.refine_prompt(
         prompt, analysis['intent'], answers, system_context
     )
     
     console.print(Panel(
         refined_prompt,
-        title="Verfeinerter Zwischen-Prompt",
+        title="Refined Intermediate Prompt",
         border_style="cyan"
     ))
     
     # 7. Enhance
-    if Confirm.ask("\nSoll dieser Prompt nun in der RAG-Engine angereichert werden?", default=True):
-        console.print("[dim]Suche passende Code-Kontexte im RAG-Index...[/dim]")
+    if Confirm.ask("\nShould this prompt be enriched by the RAG engine?", default=True):
+        console.print("[dim]Searching for matching code contexts in RAG index...[/dim]")
         
         # Search parameters
         search_prompt = refined_prompt
@@ -118,12 +119,17 @@ def main():
         
         console.print(Panel(
             result['enhanced_prompt'],
-            title="✨ Fertiger Enhanced Prompt",
+            title="✨ Final Enhanced Prompt",
             border_style="green"
         ))
         
-        console.print(f"\n[bold green]✓[/bold green] Gespeichert in: [cyan]{output_file}[/cyan]")
-        console.print("Du kannst diesen Prompt nun kopieren und an mich übergeben.")
+        try:
+            pyperclip.copy(result['enhanced_prompt'])
+            console.print("\n[bold green]✓[/bold green] Prompt automatically copied to clipboard!")
+        except Exception:
+            console.print("\n[yellow]! Could not copy to clipboard automatically.[/yellow]")
+
+        console.print(f"[dim]Saved at: [cyan]{output_file}[/cyan][/dim]")
 
 if __name__ == "__main__":
     try:

@@ -41,6 +41,7 @@ def get_workspace(project_name: str = None, github_url: str = None) -> Path:
     return config.get_workspace()
 
 import hashlib
+import pyperclip
 
 def handle_ask(args):
     prompt_text = " ".join(args.prompt)
@@ -57,64 +58,64 @@ def handle_ask(args):
             remote = git_ctx['remote_url']
             if "github.com" in remote:
                 github_url = remote
-                console.print(f"[dim]Auto-Erkennung: GitHub Repo gefunden ({github_url})[/dim]")
+                console.print(f"[dim]Auto-detection: GitHub Repo found ({github_url})[/dim]")
 
     # 1. Workspace setup
     if github_url:
         try:
             repo_path = clone_github_repo(github_url)
             workspace = get_workspace(github_url=github_url)
-            console.print(f"[dim]Nutze GitHub-Cache für Workspace.[/dim]")
+            console.print(f"[dim]Using GitHub-Cache for Workspace.[/dim]")
             
             # Auto-Index if index is missing
             rag = RAGEngine(workspace)
             if rag.stats()['total_documents'] == 0:
-                console.print(f"🔍 [yellow]Erster Lauf für dieses Repo. Indexiere...[/yellow]")
+                console.print(f"🔍 [yellow]First run for this repo. Indexing...[/yellow]")
                 rag.index_directory(repo_path, recursive=True)
         except Exception as e:
-            console.print(f"[bold red]Abbruch: GitHub Repo konnte nicht geladen werden.[/bold red]")
+            console.print(f"[bold red]Aborted: Could not load GitHub repo.[/bold red]")
             return
     else:
         workspace = get_workspace(project_name)
         if project_name:
-            console.print(f"[dim]Nutze Projekt-Workspace: {project_name}[/dim]")
+            console.print(f"[dim]Using Project-Workspace: {project_name}[/dim]")
     
     rag = RAGEngine(workspace)
     enhancer = PromptEnhancer(rag)
     
-    # 1. Analyse
-    console.print("[dim]Analysiere Intent und sammle Kontext...[/dim]")
+    # 1. Analysis
+    console.print("[dim]Analyzing intent and gathering context...[/dim]")
     analysis = enhancer.intent_analyzer.analyze(prompt_text)
     system_context = gather_all()
     
-    console.print(f"\n[cyan]Erkannter Intent:[/cyan] {analysis['intent']} ({analysis['confidence']:.0%})")
+    console.print(f"\n[cyan]Detected Intent:[/cyan] {analysis['intent']} ({analysis['confidence']:.0%})")
     
-    # 2. Lücken
+    # 2. Gaps
     gaps = enhancer.refiner.analyze_gaps(
         prompt_text, analysis['intent'], system_context
     )
     
-    # 3. Zeige was automatisch erkannt wurde
+    # 3. Show what was automatically detected
     if gaps['inferred']:
-        console.print("\n[green]Automatisch erkannt (Context Inference):[/green]")
+        console.print("\n[green]Automatically detected (Context Inference):[/green]")
         for key, value in gaps['inferred'].items():
             console.print(f"  {key}: [dim]{value}[/dim]")
     
     # 4. Completeness
-    console.print(f"\n[yellow]Prompt-Vollständigkeit: {gaps['completeness']:.0%}[/yellow]")
+    console.print(f"\n[yellow]Prompt Completeness: {gaps['completeness']:.0%}[/yellow]")
     
-    # 5. Fragen stellen
+    # 5. Ask questions
     answers = {}
     
     if gaps['missing_critical']:
-        console.print("\n[bold red]Fehlende wichtige Infos (Critical Gaps):[/bold red]\n")
+        console.print("\n[bold red]Critical Gaps (Missing important info):[/bold red]\n")
         
         for key, question in gaps['missing_critical']:
             suggestions = enhancer.refiner._generate_suggestions(key, gaps)
             
             hint = ""
             if suggestions:
-                hint = f" [dim](Vorschläge: {', '.join(suggestions)})[/dim]"
+                hint = f" [dim](Suggestions: {', '.join(suggestions)})[/dim]"
             
             answer = Prompt.ask(f"  [bold]{question}[/bold]{hint}")
             
@@ -122,26 +123,26 @@ def handle_ask(args):
                 answers[key] = answer
     
     if gaps['missing_optional']:
-        if Confirm.ask("\n[dim]Möchtest du noch optionale Details angeben?[/dim]", default=False):
+        if Confirm.ask("\n[dim]Would you like to provide optional details?[/dim]", default=False):
             for key, question in gaps['missing_optional']:
                 answer = Prompt.ask(f"  [bold]{question}[/bold]")
                 if answer.strip():
                     answers[key] = answer
     
-    # 6. Prompt verfeinern
+    # 6. Refine prompt
     refined_prompt = enhancer.refiner.refine_prompt(
         prompt_text, analysis['intent'], answers, system_context
     )
     
     console.print(Panel(
         refined_prompt,
-        title="Verfeinerter Zwischen-Prompt",
+        title="Refined Intermediate Prompt",
         border_style="cyan"
     ))
     
     # 7. Enhance
-    if Confirm.ask("\nSoll dieser Prompt nun in der RAG-Engine angereichert werden?", default=True):
-        console.print("[dim]Suche passende Code-Kontexte im RAG-Index...[/dim]")
+    if Confirm.ask("\nShould this prompt be enriched by the RAG engine?", default=True):
+        console.print("[dim]Searching for matching code contexts in RAG index...[/dim]")
         
         # Search parameters
         search_prompt = refined_prompt
@@ -181,12 +182,18 @@ def handle_ask(args):
         
         console.print(Panel(
             result['enhanced_prompt'],
-            title="✨ Fertiger Enhanced Prompt",
+            title="✨ Final Enhanced Prompt",
             border_style="green"
         ))
         
-        console.print(f"\n[bold green]✓[/bold green] Gespeichert in: [cyan]{output_file}[/cyan]")
-        console.print("Du kannst diesen Prompt nun kopieren und an mich übergeben.")
+        try:
+            pyperclip.copy(result['enhanced_prompt'])
+            clipboard_msg = "[bold green]✓[/bold green] Prompt automatically copied to clipboard!"
+        except Exception:
+            clipboard_msg = "[yellow]! Could not copy to clipboard automatically.[/yellow]"
+
+        console.print(f"\n{clipboard_msg}")
+        console.print(f"[dim]Saved at: [cyan]{output_file}[/cyan][/dim]")
 
 def handle_index(args):
     github_url = args.github
@@ -200,7 +207,7 @@ def handle_index(args):
             remote = git_ctx['remote_url']
             if "github.com" in remote:
                 github_url = remote
-                print(f"Auto-Erkennung: GitHub Repo gefunden ({github_url})")
+                print(f"Auto-detection: GitHub Repo found ({github_url})")
 
     if github_url:
         repo_path = clone_github_repo(github_url)
@@ -211,19 +218,19 @@ def handle_index(args):
         dir_to_index = Path(args.dir).resolve()
 
     rag = RAGEngine(workspace)
-    print(f"Indexiere Verzeichnis: {dir_to_index} {'(rekursiv)' if args.recursive else ''}")
+    print(f"Indexing directory: {dir_to_index} {'(recursive)' if args.recursive else ''}")
     
     stats = rag.index_directory(dir_to_index, recursive=args.recursive)
-    print(f"\n✓ Indexierung abgeschlossen.")
-    print(f"  Neu indiziert: {stats['indexed']}")
-    print(f"  Übersprungen: {stats['skipped']}")
+    print(f"\n✓ Indexing completed.")
+    print(f"  Newly indexed: {stats['indexed']}")
+    print(f"  Skipped: {stats['skipped']}")
     if stats['errors'] > 0:
-        print(f"  Fehler: {stats['errors']}")
+        print(f"  Errors: {stats['errors']}")
         
-    print("\nAktueller Index-Status:")
+    print("\nCurrent Index Status:")
     index_stats = rag.stats()
-    print(f"  Dokumente gesamt: {index_stats['total_documents']}")
-    print(f"  Vektoren im Index: {index_stats['index_vectors']}")
+    print(f"  Total documents: {index_stats['total_documents']}")
+    print(f"  Vectors in index: {index_stats['index_vectors']}")
 
 def handle_ctx(args):
     from cxm.tools.context_gatherer import main

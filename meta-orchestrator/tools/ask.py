@@ -7,6 +7,7 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).resolve().parent.parent / "src"))
 
 from cxm import Config, RAGEngine, PromptEnhancer
+import pyperclip
 
 def main():
     if len(sys.argv) < 2:
@@ -34,8 +35,14 @@ def main():
     output_file.write_text(result['enhanced'])
     
     print(result['enhanced'])
-    print("\n--------------------------------------------------------")
-    print(f"📁 Gespeichert in: {output_file}")
+    
+    try:
+        pyperclip.copy(result['enhanced'])
+        print("\n✅ Prompt automatically copied to clipboard!")
+    except Exception:
+        print("\n⚠️ Could not copy to clipboard automatically.")
+
+    print(f"📁 Saved at: {output_file}")
 
 if __name__ == "__main__":
     main()

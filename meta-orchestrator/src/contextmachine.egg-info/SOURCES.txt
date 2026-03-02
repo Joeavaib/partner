@@ -10,6 +10,7 @@ src/contextmachine.egg-info/top_level.txt
 src/cxm/__init__.py
 src/cxm/cli.py
 src/cxm/config.py
+src/cxm/dashboard.py
 src/cxm/core/__init__.py
 src/cxm/core/enhancer.py
 src/cxm/core/rag.py
@@ -20,3 +21,5 @@ src/cxm/ml/intent_analyzer.py
 src/cxm/ml/prompt_assembler.py
 src/cxm/ml/prompt_refiner.py
 src/cxm/tools/context_gatherer.py
+src/cxm/tools/github_cloner.py
+src/cxm/utils/i18n.py

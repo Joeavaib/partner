@@ -6,7 +6,7 @@ from typing import Dict, Any
 class I18n:
     _instance = None
     _data: Dict[str, Any] = {}
-    _current_lang = "de"
+    _current_lang = "en"
 
     def __new__(cls):
         if cls._instance is None:
