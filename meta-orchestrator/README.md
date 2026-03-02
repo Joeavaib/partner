@@ -12,35 +12,33 @@ CXM is a powerful local tool designed to bridge the gap between vague user inten
 - **🔄 Session Awareness**: Plugs into your active Gemini CLI chat history to maintain continuity.
 - **🛡️ 100% Local**: Your code index and logic stay on your machine.
 
-## 🚀 Installation
+## 🚀 Quick Start
 
-### 📋 Prerequisites
+### 📋 Installation
 
-Ensure Python >= 3.8 is installed.
+CXM is designed for **Linux** and **Windows**.
 
-### 🔧 Steps (Fedora)
+**1. Clone the repository:**
+```bash
+git clone https://github.com/Joeavaib/partner.git
+cd partner
+```
 
-1. Install system dependencies:
-   ```bash
-   sudo dnf install git python3
-   ```
+**2. Setup environment (Linux):**
+```bash
+python3 -m venv partnerenv
+source partnerenv/bin/activate
+pip install -e meta-orchestrator
+```
 
-2. Clone the repository:
-   ```bash
-   git clone https://github.com/Joeavaib/partner.git
-   cd partner
-   ```
+**3. Setup environment (Windows):**
+```powershell
+python -m venv partnerenv
+.\partnerenv\Scripts\Activate.ps1
+pip install -e meta-orchestrator
+```
 
-3. Create and activate a virtual environment:
-   ```bash
-   python3 -m venv partnerenv
-   source partnerenv/bin/activate
-   ```
-
-4. Install the package in editable mode:
-   ```bash
-   pip install -e meta-orchestrator
-   ```
+> **Detailed Installation Guide**: For system-specific prerequisites like `xclip` or FAISS build tools, please refer to our **[INSTALL.md](./INSTALL.md)**.
 
 ## 🛠️ Usage
 
