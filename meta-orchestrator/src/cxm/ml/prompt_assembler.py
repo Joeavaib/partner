@@ -239,31 +239,31 @@ Always prioritize project consistency and follow the patterns found in the provi
             if relevant_prompts:
                 parts.append("\n**Active Gemini CLI Session**")
                 parts.append(f"- Session ID: `{g_cli.get('session_id')}`")
-                                parts.append("- Relevant Recent User Prompts:")
-                                for p in relevant_prompts:
-                                    parts.append(f"  > \"{p}\"")
+                parts.append("- Relevant Recent User Prompts:")
+                for p in relevant_prompts:
+                    parts.append(f"  > \"{p}\"")
                                     
-                        if context.get('claudecode') and 'error' not in context['claudecode']:
-                            c_cli = context['claudecode']
-                            
-                            # Check relevance of recent prompts
-                            relevant_prompts = []
-                            if c_cli.get('recent_prompts'):
-                                user_prompt_lower = user_prompt.lower()
-                                user_words = set(re.findall(r'\b\w{4,}\b', user_prompt_lower))
-                                
-                                for p in c_cli['recent_prompts']:
-                                    p_lower = p.lower()
-                                    p_words = set(re.findall(r'\b\w{4,}\b', p_lower))
-                                    if not user_words or len(user_words & p_words) > 0:
-                                        relevant_prompts.append(p)
+        if context.get('claudecode') and 'error' not in context['claudecode']:
+            c_cli = context['claudecode']
+            
+            # Check relevance of recent prompts
+            relevant_prompts = []
+            if c_cli.get('recent_prompts'):
+                user_prompt_lower = user_prompt.lower()
+                user_words = set(re.findall(r'\b\w{4,}\b', user_prompt_lower))
                 
-                            if relevant_prompts:
-                                parts.append("\n**Claude Code CLI Session**")
-                                parts.append(f"- Project: `{c_cli.get('project')}`")
-                                parts.append("- Relevant Recent User Prompts:")
-                                for p in relevant_prompts:
-                                    parts.append(f"  > \"{p}\"")
-                        
-                        return '\n'.join(parts) if parts else ""
+                for p in c_cli['recent_prompts']:
+                    p_lower = p.lower()
+                    p_words = set(re.findall(r'\b\w{4,}\b', p_lower))
+                    if not user_words or len(user_words & p_words) > 0:
+                        relevant_prompts.append(p)
+
+            if relevant_prompts:
+                parts.append("\n**Claude Code CLI Session**")
+                parts.append(f"- Project: `{c_cli.get('project')}`")
+                parts.append("- Relevant Recent User Prompts:")
+                for p in relevant_prompts:
+                    parts.append(f"  > \"{p}\"")
+        
+        return '\n'.join(parts) if parts else ""
                 

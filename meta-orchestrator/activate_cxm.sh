@@ -3,7 +3,7 @@
 
 # Project paths
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-VENV_PATH="$PROJECT_ROOT/../partnerenv"
+VENV_PATH="$HOME/.cxm/venv"
 
 # Activate Python environment
 if [ -f "$VENV_PATH/bin/activate" ]; then
