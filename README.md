@@ -16,15 +16,13 @@ CXM is a powerful local tool designed to bridge the gap between vague user inten
 
 ### 📋 Installation
 
-CXM is designed for **Linux** and **Windows**.
-
 **1. Clone the repository:**
 ```bash
 git clone https://github.com/Joeavaib/partner.git
 cd partner
 ```
 
-**2. Automated Setup (Linux only):**
+**2. Automated Setup (Linux):**
 ```bash
 chmod +x install.sh
 ./install.sh
@@ -32,19 +30,16 @@ chmod +x install.sh
 
 **3. Manual Setup (Linux):**
 ```bash
-python3 -m venv partnerenv
-source partnerenv/bin/activate
-pip install -e meta-orchestrator
+python3.12 -m venv partner
+source partner/bin/activate
+pip install ./meta-orchestrator
 ```
 
-**4. Manual Setup (Windows):**
-```powershell
-python -m venv partnerenv
-.\partnerenv\Scripts\Activate.ps1
-pip install -e meta-orchestrator
+**4. Activate Environment:**
+To use CXM later, always activate the virtual environment:
+```bash
+source partner/bin/activate
 ```
-
-> **Detailed Installation Guide**: For system-specific prerequisites like `xclip` or FAISS build tools, please refer to our **[INSTALL.md](./INSTALL.md)**.
 
 ## 🛠️ Usage
 
