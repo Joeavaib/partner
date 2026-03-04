@@ -6,6 +6,7 @@ from datetime import datetime
 import json
 import hashlib
 import os
+import subprocess
 
 from sentence_transformers import SentenceTransformer
 import faiss
@@ -117,6 +118,34 @@ class RAGEngine:
             logger.error(f"Error indexing {file_path}: {e}")
             return False
     
+    def _get_git_files(self, directory: Path) -> Optional[List[Path]]:
+        """Try to get a list of non-ignored files using git ls-files"""
+        try:
+            # Check if it's a git repo
+            result = subprocess.run(
+                ['git', 'rev-parse', '--is-inside-work-tree'],
+                cwd=directory, capture_output=True, text=True, check=False
+            )
+            if result.returncode != 0:
+                return None
+            
+            # Get tracked and untracked-but-not-ignored files
+            result = subprocess.run(
+                ['git', 'ls-files', '--cached', '--others', '--exclude-standard'],
+                cwd=directory, capture_output=True, text=True, check=False
+            )
+            if result.returncode == 0:
+                paths = []
+                for line in result.stdout.splitlines():
+                    # Handle case where git returns paths relative to repo root
+                    # but we might be indexing a subdirectory.
+                    # Actually ls-files in cwd returns paths relative to cwd.
+                    paths.append((directory / line).resolve())
+                return paths
+        except Exception:
+            pass
+        return None
+
     def index_directory(
         self,
         directory: Path,
@@ -124,49 +153,84 @@ class RAGEngine:
         recursive: bool = True,
         force: bool = False
     ) -> Dict[str, int]:
-        """Index all matching files in directory"""
+        """Index all matching files in directory while respecting .gitignore and common patterns"""
         
-        directory = Path(directory)
+        directory = Path(directory).resolve()
         if not directory.exists():
             return {'indexed': 0, 'skipped': 0, 'errors': 0}
         
         logger.info(f"Indexing directory: {directory}")
         
-        # Collect files
+        # Hardcoded skip lists (fallbacks if not in git or extra safety)
+        skip_dirs = {
+            '.git', '.svn', '.hg', '.bzr', '__pycache__', 'node_modules', 
+            '.venv', 'venv', 'env', '.cxm', 'sessions', 'partnerenv', 
+            'knowledge-base', 'build', 'dist', 'target', 'out', 'bin', 'obj', 
+            '.idea', '.vscode', '.settings', '.pytest_cache', '.tox',
+            'models', 'weights', 'checkpoints', 'datasets'
+        }
+        skip_exts = {
+            # Compiled/Binary
+            '.pyc', '.pyo', '.pyd', '.so', '.dylib', '.dll', '.exe', '.bin',
+            '.obj', '.o', '.a', '.lib', '.out', '.app',
+            # Archives
+            '.zip', '.tar', '.gz', '.whl', '.egg', '.7z', '.rar', '.bz2', '.xz',
+            # Images/Media
+            '.jpg', '.jpeg', '.png', '.gif', '.pdf', '.svg', '.ico', '.mp3', '.mp4', '.wav', '.mov',
+            # Models/Large Data
+            '.h5', '.pth', '.pt', '.tflite', '.onnx', '.weights', '.pb', '.gguf', 
+            '.ckpt', '.safetensors', '.model', '.pkl', '.pickle', '.npy', '.npz',
+            # Lock files
+            '.lock', 'package-lock.json', 'pnpm-lock.yaml', 'yarn.lock'
+        }
+        skip_names = {
+            'package-lock.json', 'pnpm-lock.yaml', 'yarn.lock', 'composer.lock',
+            'Cargo.lock', 'Gemfile.lock', 'poetry.lock', 'mix.lock'
+        }
+        
+        # 1 MB size limit for indexing to avoid models/huge data
+        MAX_FILE_SIZE = 1 * 1024 * 1024 
+        
+        # Try to use git to get file list
+        git_files = self._get_git_files(directory)
+        
+        if git_files:
+            logger.info(f"Using git ls-files for discovery ({len(git_files)} candidates)")
+            candidates = git_files
+        else:
+            logger.info("Using standard directory walking (not a git repo or git failed)")
+            pattern = '**/*' if recursive else '*'
+            candidates = directory.glob(pattern)
+            
         files = []
-        pattern = '**/*' if recursive else '*'
-        
-        skip_dirs = {'.git', '__pycache__', 'node_modules', '.venv', 'venv', '.cxm', 'sessions', 'partnerenv', 'knowledge-base', 'build', 'dist'}
-        skip_exts = {'.pyc', '.so', '.dylib', '.dll', '.exe', '.bin',
-                     '.jpg', '.jpeg', '.png', '.gif', '.pdf', '.zip',
-                     '.tar', '.gz', '.whl', '.egg'}
-        
-        for file_path in directory.glob(pattern):
+        for file_path in candidates:
             if not file_path.is_file():
                 continue
-            
-            # Skip hidden/ignored dirs and egg-info
+                
+            # Basic filters
             if any(part in skip_dirs or part.endswith('.egg-info') for part in file_path.parts):
                 continue
-            
-            if file_path.name.startswith('.'):
+                
+            if file_path.name.startswith('.') or file_path.name in skip_names:
                 continue
-            
+                
             if file_path.suffix.lower() in skip_exts:
                 continue
-
-            # Skip tiny files (e.g. top_level.txt which is often just one word)
+                
+            # Size check
             try:
-                if file_path.stat().st_size < 10:
+                size = file_path.stat().st_size
+                if size < 10 or size > MAX_FILE_SIZE:
                     continue
             except:
                 continue
-            
+                
+            # Extension filter (if provided)
             if extensions and file_path.suffix not in extensions:
                 continue
             
             files.append(file_path)
-        
+            
         # Index
         stats = {'indexed': 0, 'skipped': 0, 'errors': 0}
         
@@ -178,7 +242,7 @@ class RAGEngine:
                     stats['skipped'] += 1
             except Exception:
                 stats['errors'] += 1
-        
+                
         self.save()
         logger.info(f"Indexing complete. Stats: {stats}")
         return stats

@@ -5,6 +5,7 @@ RAG Engine for CXM
 """
 import sys
 import os
+import subprocess
 
 # Suppress HuggingFace/transformers logging and progress bars
 os.environ['TRANSFORMERS_VERBOSITY'] = 'error'
@@ -166,31 +167,121 @@ class RAGEngine:
             print(f"⚠ Error indexing {file_path}: {e}")
             return None
 
-    def index_directory(self, directory, extensions=None, recursive=True):
-        """Index all code files in a directory"""
-        if extensions is None:
-            extensions = {'.py', '.js', '.ts', '.jsx', '.tsx', '.rs', '.go', '.java', '.c', '.cpp', '.h', '.hpp', '.md', '.txt'}
+    def _get_git_files(self, directory: Path):
+        """Try to get a list of non-ignored files using git ls-files"""
+        try:
+            # Check if it's a git repo
+            result = subprocess.run(
+                ['git', 'rev-parse', '--is-inside-work-tree'],
+                cwd=directory, capture_output=True, text=True, check=False
+            )
+            if result.returncode != 0:
+                return None
             
-        dir_path = Path(directory)
+            # Get tracked and untracked-but-not-ignored files
+            result = subprocess.run(
+                ['git', 'ls-files', '--cached', '--others', '--exclude-standard'],
+                cwd=directory, capture_output=True, text=True, check=False
+            )
+            if result.returncode == 0:
+                paths = []
+                for line in result.stdout.splitlines():
+                    paths.append((directory / line).resolve())
+                return paths
+        except Exception:
+            pass
+        return None
+
+    def index_directory(self, directory, extensions=None, recursive=True):
+        """Index all code files in a directory while respecting .gitignore and common patterns"""
+        if extensions is None:
+            extensions = {'.py', '.js', '.ts', '.jsx', '.tsx', '.rs', '.go', '.java', '.c', '.cpp', '.h', '.hpp', '.md', '.txt', '.yaml', '.yml', '.json', '.toml', '.sh', '.sql'}
+            
+        dir_path = Path(directory).resolve()
+        if not dir_path.exists():
+            print(f"Directory not found: {dir_path}")
+            return 0
+            
+        # Hardcoded skip lists (fallbacks if not in git or extra safety)
+        skip_dirs = {
+            '.git', '.svn', '.hg', '.bzr', '__pycache__', 'node_modules', 
+            '.venv', 'venv', 'env', '.cxm', 'sessions', 'partnerenv', 
+            'knowledge-base', 'build', 'dist', 'target', 'out', 'bin', 'obj', 
+            '.idea', '.vscode', '.settings', '.pytest_cache', '.tox',
+            'models', 'weights', 'checkpoints', 'datasets'
+        }
+        skip_exts = {
+            # Compiled/Binary
+            '.pyc', '.pyo', '.pyd', '.so', '.dylib', '.dll', '.exe', '.bin',
+            '.obj', '.o', '.a', '.lib', '.out', '.app',
+            # Archives
+            '.zip', '.tar', '.gz', '.whl', '.egg', '.7z', '.rar', '.bz2', '.xz',
+            # Images/Media
+            '.jpg', '.jpeg', '.png', '.gif', '.pdf', '.svg', '.ico', '.mp3', '.mp4', '.wav', '.mov',
+            # Models/Large Data
+            '.h5', '.pth', '.pt', '.tflite', '.onnx', '.weights', '.pb', '.gguf', 
+            '.ckpt', '.safetensors', '.model', '.pkl', '.pickle', '.npy', '.npz',
+            # Lock files
+            '.lock', 'package-lock.json', 'pnpm-lock.yaml', 'yarn.lock'
+        }
+        skip_names = {
+            'package-lock.json', 'pnpm-lock.yaml', 'yarn.lock', 'composer.lock',
+            'Cargo.lock', 'Gemfile.lock', 'poetry.lock', 'mix.lock'
+        }
+        
+        # 1 MB size limit for indexing to avoid models/huge data
+        MAX_FILE_SIZE = 1 * 1024 * 1024 
+        
+        # Try to use git to get file list
+        git_files = self._get_git_files(dir_path)
+        
+        if git_files:
+            candidates = git_files
+        else:
+            pattern = '**/*' if recursive else '*'
+            candidates = dir_path.glob(pattern)
+            
         indexed = 0
         skipped = 0
         
-        pattern = '**/*' if recursive else '*'
-        
-        for file_path in dir_path.glob(pattern):
-            if file_path.is_file() and file_path.suffix in extensions:
-                # Skip common non-code files, hidden dirs, and environments
-                ignore_dirs = {'venv', 'env', 'partnerenv', 'node_modules', '__pycache__', 'dist', 'build', '.maestro', 'sessions'}
-                if any(part.startswith('.') or part in ignore_dirs for part in file_path.parts):
+        for file_path in candidates:
+            if not file_path.is_file():
+                continue
+                
+            # Basic filters
+            if any(part in skip_dirs or part.endswith('.egg-info') for part in file_path.parts):
+                skipped += 1
+                continue
+                
+            if file_path.name.startswith('.') or file_path.name in skip_names:
+                skipped += 1
+                continue
+                
+            if file_path.suffix.lower() in skip_exts:
+                skipped += 1
+                continue
+                
+            # Size check
+            try:
+                size = file_path.stat().st_size
+                if size < 10 or size > MAX_FILE_SIZE:
                     skipped += 1
                     continue
-                    
-                if self.index_code_file(file_path):
-                    indexed += 1
-                    if indexed % 10 == 0:
-                        print(f"  Indexed {indexed} files...")
-                else:
-                    skipped += 1
+            except:
+                skipped += 1
+                continue
+                
+            # Extension filter
+            if extensions and file_path.suffix not in extensions:
+                skipped += 1
+                continue
+            
+            if self.index_code_file(file_path):
+                indexed += 1
+                if indexed % 10 == 0:
+                    print(f"  Indexed {indexed} files...")
+            else:
+                skipped += 1
         
         self.save_index()
         print(f"✓ Indexed {indexed} files, skipped {skipped}")

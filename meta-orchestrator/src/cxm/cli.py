@@ -177,6 +177,50 @@ def handle_ctx(args):
     from cxm.tools.context_gatherer import main
     main()
 
+
+def handle_harvest(args):
+    # Non-interactive harvesting for agentic workflows
+    workspace = get_workspace(args.project, args.github)
+    rag = RAGEngine(workspace)
+    
+    # Optional: incremental index
+    if not args.no_index and not args.github and not args.project:
+        rag.index_directory(Path.cwd(), recursive=True)
+        
+    enhancer = PromptEnhancer(rag)
+    
+    # Combine keywords
+    query = " ".join(args.keywords)
+    intent_override = args.intent
+    
+    analysis = enhancer.intent_analyzer.analyze(query)
+    intent = intent_override if intent_override else analysis['intent']
+    
+    # Silent retrieval (no gap checking or prompting)
+    candidates = enhancer.retriever.retrieve(query=query, context_needs=analysis['context_needs'], k=10)
+    selected = enhancer.reranker.rerank(query=query, candidates=candidates, top_k=args.limit)
+    
+    # Build clean output for the orchestrator
+    print("<!-- CXM HARVEST START -->")
+    print(f"<harvest_intent>{intent}</harvest_intent>")
+    if not selected:
+        print("<harvest_warning>No matching context found.</harvest_warning>")
+    
+    import os
+    cwd = os.getcwd()
+    for doc in selected:
+        # Convert to relative path if possible
+        doc_path = doc['path']
+        if doc_path.startswith(cwd):
+            doc_path = os.path.relpath(doc_path, cwd)
+            
+        print(f"\n<file_context path=\"{doc_path}\">")
+        content = doc.get('full_content', doc.get('content_preview', ''))
+        print(content)
+        print("</file_context>")
+    print("<!-- CXM HARVEST END -->")
+
+
 def main():
     parser = argparse.ArgumentParser(description="CXM (ContextMachine) CLI - Your AI Partner Orchestrator")
     parser.add_argument("-p", "--project", type=str, help="Specify project name")
@@ -199,6 +243,15 @@ def main():
     search_parser.add_argument("query", type=str, help="Search query")
     search_parser.add_argument("--limit", type=int, default=5)
     
+
+    # harvest
+    harvest_parser = subparsers.add_parser("harvest", help="Non-interactive context harvesting for agents")
+    harvest_parser.add_argument("keywords", nargs="+", help="Keywords or target files")
+    harvest_parser.add_argument("--intent", type=str, help="Override intent (e.g. Feature, Bugfix)")
+    harvest_parser.add_argument("--format", type=str, default="xml", help="Output format")
+    harvest_parser.add_argument("--limit", type=int, default=5, help="Number of files to retrieve")
+    harvest_parser.add_argument("--no-index", action="store_true", help="Skip incremental indexing")
+
     # ctx
     subparsers.add_parser("ctx", help="Print current system context")
     
@@ -210,6 +263,9 @@ def main():
         handle_index(args)
     elif args.command == "search":
         handle_search(args)
+
+    elif args.command == "harvest":
+        handle_harvest(args)
     elif args.command == "ctx":
         handle_ctx(args)
     else:
