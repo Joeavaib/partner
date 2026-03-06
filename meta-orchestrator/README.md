@@ -50,6 +50,7 @@ The Dashboard is your command center. Use it to:
 ### CLI Commands
 - **Index your project**: `cxm index`
 - **Ask a question**: `cxm ask "refactor my auth logic"`
+- **Agentic Workflow**: `cxm harvest "database connection"` (Outputs token-efficient XML for LLMs)
 - **Search Knowledge**: `cxm search "database connection"`
 - **Check Context**: `cxm ctx`
 

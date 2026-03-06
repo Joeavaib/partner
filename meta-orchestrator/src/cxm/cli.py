@@ -207,11 +207,31 @@ def handle_harvest(args):
     if not selected:
         print("<harvest_warning>No matching context found.</harvest_warning>")
     
+    import re
+    MAX_CHARS = 12000
+    current_chars = 0
+
     for doc in selected:
+        if current_chars >= MAX_CHARS:
+            print(f"\n<harvest_warning>Context truncated. Reached {MAX_CHARS} char limit to save token budget.</harvest_warning>")
+            break
+
         doc_path = format_path(doc['path'])
             
         print(f"\n<file_context path=\"{doc_path}\">")
-        content = doc.get('full_content', doc.get('content_preview', ''))
+        
+        # Prioritize the specific chunk (content_preview) over the full file content to save tokens
+        content = doc.get('content_preview', doc.get('full_content', ''))
+        
+        # Compression: Remove consecutive empty lines to save tokens
+        content = re.sub(r'\n\s*\n', '\n\n', content.strip())
+        
+        # Guard against massive individual chunks
+        if len(content) > 3000:
+            content = content[:3000] + "\n... [Code truncated for token efficiency] ..."
+
+        current_chars += len(content)
+        
         print(content)
         print("</file_context>")
     print("<!-- CXM HARVEST END -->")

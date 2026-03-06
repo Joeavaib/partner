@@ -62,7 +62,27 @@ cxm search "Search query" [--limit N]
 
 ---
 
-### 4. `cxm ctx`
+### 4. `cxm harvest`
+Non-interactive, highly optimized context extraction designed for autonomous AI agents and "Agentic Workflows".
+
+**Syntax:**
+```bash
+cxm harvest "Search keywords" [--intent "specific intent"] [--limit N]
+```
+
+**What it does:**
+1. **Silent Retrieval:** Performs RAG search without any interactive prompts or gap checks.
+2. **Token Efficiency:** Uses a strict "Token Diet" by prioritizing specific code chunks over full files, compressing whitespace, and enforcing a hard global character limit (12,000 chars) to prevent context window overflow.
+3. **Agent-Ready Output:** Prints results directly to `stdout` wrapped in clean XML tags (`<file_context path="...">`) for immediate ingestion by downstream agents.
+
+**Parameters:**
+*   `--intent`: Manually override the ML-based intent analysis (e.g., `add_feature`, `fix_bug`).
+*   `--limit`: Maximum number of RAG chunks to process (defaults to 5).
+*   `--no-index`: Skip incremental indexing before harvesting.
+
+---
+
+### 5. `cxm ctx`
 Debug tool to see exactly what "Partner" knows about your current environment.
 
 **Syntax:**
