@@ -20,6 +20,7 @@ from pathlib import Path
 from cxm import Config, RAGEngine, PromptEnhancer
 from cxm.utils.i18n import i18n, _
 from cxm.utils.logger import logger
+from cxm.utils.paths import format_path
 
 console = Console()
 
@@ -262,7 +263,7 @@ class CXMDashboard:
         except Exception:
             clipboard_msg = "[yellow]! Could not copy to clipboard automatically.[/yellow]"
 
-        console.print(f"\n[bold green]✓[/bold green] {self.t('builder.saved')} [cyan]{prompt_file}[/cyan]")
+        console.print(f"\n[bold green]✓[/bold green] {self.t('builder.saved')} [cyan]{format_path(str(prompt_file))}[/cyan]")
         console.print(f"{clipboard_msg}")
         console.print("\n[bold yellow]--- " + self.t('builder.finished').upper() + " (START) ---[/bold yellow]")
         console.print(final_prompt)

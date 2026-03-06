@@ -188,8 +188,8 @@ class RAGEngine:
             'Cargo.lock', 'Gemfile.lock', 'poetry.lock', 'mix.lock'
         }
         
-        # 1 MB size limit for indexing to avoid models/huge data
-        MAX_FILE_SIZE = 1 * 1024 * 1024 
+        # 10 MB size limit for indexing to avoid models/huge data
+        MAX_FILE_SIZE = 10 * 1024 * 1024 
         
         # Try to use git to get file list
         git_files = self._get_git_files(directory)

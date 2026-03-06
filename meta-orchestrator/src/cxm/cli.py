@@ -15,6 +15,7 @@ from cxm import Config, RAGEngine, PromptEnhancer
 from cxm.tools.context_gatherer import gather_all
 from cxm.tools.github_cloner import clone_github_repo
 from cxm.utils.logger import logger
+from cxm.utils.paths import format_path
 
 def get_workspace(project_name: str = None, github_url: str = None) -> Path:
     """Find the central knowledge-base workspace."""
@@ -136,7 +137,7 @@ def handle_ask(args):
             clipboard_msg = "[yellow]! Could not copy to clipboard automatically.[/yellow]"
 
         console.print(f"\n{clipboard_msg}")
-        console.print(f"[dim]Saved at: [cyan]{output_file}[/cyan][/dim]")
+        console.print(f"[dim]Saved at: [cyan]{format_path(str(output_file))}[/cyan][/dim]")
 
 def handle_index(args):
     github_url = args.github
@@ -150,7 +151,7 @@ def handle_index(args):
         dir_to_index = Path(args.dir).resolve()
 
     rag = RAGEngine(workspace)
-    print(f"Indexing directory: {dir_to_index} {'(recursive)' if args.recursive else ''}")
+    print(f"Indexing directory: {format_path(str(dir_to_index))} {'(recursive)' if args.recursive else ''}")
     stats = rag.index_directory(dir_to_index, recursive=args.recursive)
     print(f"\n✓ Indexing completed. Newly indexed: {stats['indexed']}, Skipped: {stats['skipped']}, Errors: {stats['errors']}")
     
@@ -169,7 +170,7 @@ def handle_search(args):
 
     for i, res in enumerate(results):
         console.print(f"\n[bold cyan][{i+1}] {res['name']}[/bold cyan] (Sim: {res['similarity']:.2f})")
-        console.print(f"[dim]{res['path']}[/dim]")
+        console.print(f"[dim]{format_path(res['path'])}[/dim]")
         content = res.get('full_content', res.get('content_preview', ''))
         console.print(Panel(content[:1000] + ("..." if len(content) > 1000 else ""), border_style="dim"))
 
@@ -206,13 +207,8 @@ def handle_harvest(args):
     if not selected:
         print("<harvest_warning>No matching context found.</harvest_warning>")
     
-    import os
-    cwd = os.getcwd()
     for doc in selected:
-        # Convert to relative path if possible
-        doc_path = doc['path']
-        if doc_path.startswith(cwd):
-            doc_path = os.path.relpath(doc_path, cwd)
+        doc_path = format_path(doc['path'])
             
         print(f"\n<file_context path=\"{doc_path}\">")
         content = doc.get('full_content', doc.get('content_preview', ''))
