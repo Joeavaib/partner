@@ -80,43 +80,80 @@ class RAGEngine:
 
     def index_file(self, file_path: Path, force: bool = False) -> bool:
         """
-        Index single file
-        Returns True if indexed, False if skipped
+        Index file by splitting it into overlapping chunks for better retrieval precision.
+        Returns True if at least one chunk was indexed.
         """
         file_path = Path(file_path).resolve()
         
         if not file_path.exists() or not file_path.is_file():
             return False
         
+        file_hash = self._file_hash(file_path)
+        
+        # Check if already indexed with same hash
         if not force and self._is_indexed(file_path):
             return False
+            
+        # If file already exists in index but hash is different (or force), 
+        # we should ideally remove old chunks.
+        # For simplicity in this local-first tool, we mark them as deleted.
+        self._remove_file_chunks(file_path)
         
         try:
             content = file_path.read_text(encoding='utf-8', errors='ignore')
             if not content.strip():
                 return False
             
-            # Embed
-            embedding = self.model.encode([content])[0]
-            self.index.add(np.array([embedding], dtype=np.float32))
+            # Simple chunking strategy: split by character count with overlap
+            # 1200 chars is ~300 tokens, 200 char overlap
+            CHUNK_SIZE = 1200 
+            OVERLAP = 200
             
-            # Store metadata (WITHOUT full_content for file-based docs)
-            self.metadata.append({
-                'id': len(self.metadata),
-                'path': str(file_path),
-                'name': file_path.name,
-                'extension': file_path.suffix,
-                'size': len(content),
-                'hash': self._file_hash(file_path),
-                'indexed_at': datetime.now().isoformat(),
-                'content_preview': content[:1000], # Keep a larger preview but not all
-                # 'full_content': content, <-- REMOVED for space optimization
-            })
+            chunks = []
+            if len(content) <= CHUNK_SIZE:
+                chunks = [content]
+            else:
+                start = 0
+                while start < len(content):
+                    end = start + CHUNK_SIZE
+                    chunk = content[start:end]
+                    if chunk.strip():
+                        chunks.append(chunk)
+                    start += (CHUNK_SIZE - OVERLAP)
+            
+            if not chunks:
+                return False
+
+            # Embed all chunks
+            embeddings = self.model.encode(chunks)
+            self.index.add(np.array(embeddings, dtype=np.float32))
+            
+            # Store metadata for each chunk
+            for i, (chunk, embedding) in enumerate(zip(chunks, embeddings)):
+                self.metadata.append({
+                    'id': len(self.metadata), # ID in metadata matches FAISS index
+                    'path': str(file_path),
+                    'name': file_path.name,
+                    'extension': file_path.suffix,
+                    'size': len(content),
+                    'chunk_index': i,
+                    'total_chunks': len(chunks),
+                    'hash': file_hash,
+                    'indexed_at': datetime.now().isoformat(),
+                    'content_preview': chunk, # In chunk mode, preview IS the chunk
+                })
             
             return True
         except Exception as e:
             logger.error(f"Error indexing {file_path}: {e}")
             return False
+
+    def _remove_file_chunks(self, file_path: Path):
+        """Mark all chunks belonging to a specific file as deleted"""
+        path_str = str(file_path.resolve())
+        for m in self.metadata:
+            if m.get('path') == path_str:
+                m['_deleted'] = True
     
     def _get_git_files(self, directory: Path) -> Optional[List[Path]]:
         """Try to get a list of non-ignored files using git ls-files"""
@@ -293,9 +330,12 @@ class RAGEngine:
         
         query_emb = self.model.encode([query])[0]
         
+        # Search for more than k to account for deleted items
+        fetch_k = min(k * 5, len(self.metadata))
+        
         distances, indices = self.index.search(
             np.array([query_emb], dtype=np.float32),
-            min(k, len(self.metadata))
+            fetch_k
         )
         
         results = []
@@ -303,12 +343,16 @@ class RAGEngine:
             if idx < 0 or idx >= len(self.metadata):
                 continue
             
+            metadata = self.metadata[idx]
+            if metadata.get('_deleted'):
+                continue
+                
             similarity = float(1 / (1 + dist))
             
             if similarity < min_similarity:
                 continue
             
-            result = self.metadata[idx].copy()
+            result = metadata.copy()
             result['similarity'] = similarity
             result['distance'] = float(dist)
             
@@ -316,6 +360,8 @@ class RAGEngine:
             result['full_content'] = self._get_content(result)
             
             results.append(result)
+            if len(results) >= k:
+                break
         
         return results
     
