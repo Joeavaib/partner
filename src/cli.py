@@ -11,7 +11,9 @@ import pyperclip
 # Ensure we can find the modules if we're running locally without installation
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from src import Config, RAGEngine, PromptEnhancer
+from src.config import Config
+from src.core.rag import RAGEngine
+from src.core.enhancer import PromptEnhancer
 from src.ml.context_evaluator import ContextEvaluator
 from src.tools.context_gatherer import gather_all
 from src.tools.github_cloner import clone_github_repo
@@ -103,8 +105,7 @@ def handle_ask(args):
         # Use unified pipeline from Enhancer
         pipeline_result = enhancer.run_evaluation_pipeline(
             query=refined_prompt,
-            intent=analysis['intent'],
-            context_needs=analysis['context_needs'],
+            analysis=analysis,
             system_context=system_context,
             max_contexts=5,
             token_budget=4000
@@ -196,13 +197,13 @@ def handle_harvest(args):
     intent_override = args.intent
     
     analysis = enhancer.intent_analyzer.analyze(query)
-    intent = intent_override if intent_override else analysis['intent']
+    if intent_override:
+        analysis['intent'] = intent_override
     
     # Use unified pipeline from Enhancer
     pipeline_result = enhancer.run_evaluation_pipeline(
         query=query,
-        intent=intent,
-        context_needs=analysis['context_needs'],
+        analysis=analysis,
         max_contexts=args.limit,
         token_budget=12000 # High budget for agents
     )
@@ -211,7 +212,7 @@ def handle_harvest(args):
             
     # Build clean output for the orchestrator
     print("<!-- CXM HARVEST START -->")
-    print(f"<harvest_intent>{intent}</harvest_intent>")
+    print(f"<harvest_intent>{analysis['intent']}</harvest_intent>")
     if not selected:
         print("<harvest_warning>No matching context found.</harvest_warning>")
     

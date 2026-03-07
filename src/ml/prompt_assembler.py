@@ -145,57 +145,80 @@ Always prioritize project consistency and follow the patterns found in the provi
         contexts: List[Dict],
         max_tokens: int
     ) -> tuple:
-        """Format contexts with citations, respecting token budget and applying token compression"""
+        """
+        Stage 4: Context Synthesis.
+        Groups relevant chunks by type and builds a structured mission briefing.
+        """
         import re
         
         if not contexts:
             return "(No relevant context found)", []
         
+        # 1. Group by Relevance Type
+        grouped = {
+            'direct_code': [],
+            'architecture': [],
+            'pattern': [],
+            'logic': [],
+            'general': []
+        }
+        
+        for ctx in contexts:
+            rtype = ctx.get('_relevance_type', 'general')
+            grouped.setdefault(rtype, []).append(ctx)
+            
         parts = []
         citations = []
         total_chars = 0
-        max_chars = max_tokens * 4  # Rough token-to-char ratio
+        max_chars = max_tokens * 4
         
-        for i, ctx in enumerate(contexts, 1):
-            # Build citation
-            citation = {
-                'id': i,
-                'path': ctx.get('path', 'unknown'),
-                'name': Path(ctx.get('path', 'unknown')).name,
-                'similarity': ctx.get('similarity', ctx.get('final_score', 0)),
-                'reason': ctx.get('_evaluation_reason', '')
-            }
+        # 2. Synthesize Sections
+        section_order = ['direct_code', 'architecture', 'logic', 'pattern', 'general']
+        section_titles = {
+            'direct_code': "## 💻 REUSABLE CODE BLOCKS",
+            'architecture': "## 🏗️ ARCHITECTURAL DECISIONS",
+            'logic': "## 🔢 LOGIC & FORMULAS",
+            'pattern': "## 🎨 ESTABLISHED PATTERNS",
+            'general': "## 📝 ADDITIONAL CONTEXT"
+        }
+
+        for rtype in section_order:
+            items = grouped.get(rtype, [])
+            if not items: continue
             
-            # Get content and apply token compression
-            content = ctx.get('full_content', ctx.get('content_preview', ''))
-            # Compression: Remove consecutive empty lines and trailing whitespace
-            content = re.sub(r'\n\s*\n', '\n\n', content.strip())
+            parts.append(section_titles[rtype])
             
-            # Calculate available space for this context
-            remaining = max_chars - total_chars
-            header_size = 150  # Rough estimate for header
-            
-            if remaining < header_size + 50:
-                break  # Not enough space
-            
-            # Truncate content if needed
-            max_content_chars = remaining - header_size
-            if len(content) > max_content_chars:
-                content = content[:max_content_chars] + "\n... [Code truncated for token efficiency] ..."
-            
-            # Format
-            reason_str = f" | Selection Reason: {citation['reason']}" if citation['reason'] else ""
-            block = (
-                f"## [{i}] {citation['name']}\n"
-                f"Relevance: {citation['similarity']:.0%} | Path: `{citation['path']}`{reason_str}\n\n"
-                f"```\n{content}\n```\n"
-            )
-            
-            parts.append(block)
-            citations.append(citation)
-            total_chars += len(block)
+            for ctx in items:
+                citation_id = len(citations) + 1
+                citation = {
+                    'id': citation_id,
+                    'path': ctx.get('path', 'unknown'),
+                    'name': Path(ctx.get('path', 'unknown')).name,
+                    'similarity': ctx.get('similarity', ctx.get('_relevance_score', 0)),
+                    'reason': ctx.get('_evaluation_reason', '')
+                }
+                
+                content = ctx.get('full_content', ctx.get('content_preview', ''))
+                # Token Compression
+                content = re.sub(r'\n\s*\n', '\n\n', content.strip())
+                
+                # Format block based on type
+                if rtype == 'direct_code':
+                    block = f"### [{citation_id}] {citation['name']}\n```python\n{content}\n```\n"
+                else:
+                    # Provide a concise summary for non-code blocks
+                    summary = content[:500] + ("..." if len(content) > 500 else "")
+                    block = f"- **[{citation_id}] {citation['name']}**: {summary}\n"
+                
+                if total_chars + len(block) > max_chars:
+                    break
+                    
+                parts.append(block)
+                citations.append(citation)
+                total_chars += len(block)
         
         return '\n'.join(parts), citations
+
 
     def _format_system_context(self, context: Dict, user_prompt: str = "") -> str:
         """Format system context"""

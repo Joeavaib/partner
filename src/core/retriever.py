@@ -123,42 +123,40 @@ class HybridRetriever:
         semantic: List[Dict],
         keyword: List[Dict]
     ) -> Dict[int, Dict]:
-        """Merge semantic and keyword results"""
+        """Merge semantic and keyword results using Reciprocal Rank Fusion (RRF)"""
         
         merged = {}
+        k = 60 # Standard RRF constant
         
-        # Normalize semantic scores
-        max_sem = max((r['similarity'] for r in semantic), default=1.0)
-        
-        for r in semantic:
+        # Rank Semantic
+        for rank, r in enumerate(semantic):
             doc_id = r['id']
             merged[doc_id] = r.copy()
-            merged[doc_id]['semantic_score'] = r['similarity'] / max_sem if max_sem > 0 else 0
-            merged[doc_id]['keyword_score'] = 0.0
+            # RRF Score for Semantic
+            merged[doc_id]['semantic_rrf'] = 1.0 / (k + rank + 1)
+            merged[doc_id]['keyword_rrf'] = 0.0
         
-        # Normalize keyword scores
-        max_kw = max((r.get('bm25_score', 0) for r in keyword), default=1.0)
-        
-        for r in keyword:
+        # Rank Keyword
+        for rank, r in enumerate(keyword):
             doc_id = r['id']
-            kw_norm = r.get('bm25_score', 0) / max_kw if max_kw > 0 else 0
+            kw_rrf = 1.0 / (k + rank + 1)
             
             if doc_id in merged:
-                merged[doc_id]['keyword_score'] = kw_norm
+                merged[doc_id]['keyword_rrf'] = kw_rrf
             else:
                 merged[doc_id] = r.copy()
-                merged[doc_id]['semantic_score'] = 0.0
-                merged[doc_id]['keyword_score'] = kw_norm
+                merged[doc_id]['semantic_rrf'] = 0.0
+                merged[doc_id]['keyword_rrf'] = kw_rrf
         
-        # Calculate hybrid score
+        # Calculate hybrid RRF score
         for doc in merged.values():
-            # If no BM25, rely 100% on semantic
             if not self.bm25:
-                doc['hybrid_score'] = doc.get('semantic_score', 0)
+                doc['hybrid_score'] = doc.get('semantic_rrf', 0)
             else:
+                # Weighted RRF
                 doc['hybrid_score'] = (
-                    self.semantic_weight * doc.get('semantic_score', 0) +
-                    self.keyword_weight * doc.get('keyword_score', 0)
+                    self.semantic_weight * doc.get('semantic_rrf', 0) +
+                    self.keyword_weight * doc.get('keyword_rrf', 0)
                 )
         
         return merged

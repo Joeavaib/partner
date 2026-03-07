@@ -52,12 +52,12 @@ class RAGEngine:
             except Exception as e:
                 logger.error(f"Failed to load index: {e}. Creating new one.")
                 # Upgrade to HNSW for scalable, fast approximate nearest neighbor search
-                self.index = faiss.IndexHNSWFlat(self.embedding_dim, 32)
-                self.index.hnsw.efConstruction = 40
+                self.index = faiss.IndexHNSWFlat(self.embedding_dim, 32, faiss.METRIC_INNER_PRODUCT)
+                self.index.hnsw.efConstruction = 128
                 self.metadata = []
         else:
-            self.index = faiss.IndexHNSWFlat(self.embedding_dim, 32)
-            self.index.hnsw.efConstruction = 40
+            self.index = faiss.IndexHNSWFlat(self.embedding_dim, 32, faiss.METRIC_INNER_PRODUCT)
+            self.index.hnsw.efConstruction = 128
             self.metadata = []
     
     def _file_hash(self, path: Path) -> str:
@@ -155,8 +155,9 @@ class RAGEngine:
             if not chunks:
                 return False
 
-            # Embed all chunks
+            # Embed and normalize all chunks for Cosine Similarity
             embeddings = self.model.encode(chunks)
+            faiss.normalize_L2(embeddings)
             self.index.add(np.array(embeddings, dtype=np.float32))
             
             # Store metadata for each chunk
@@ -221,8 +222,14 @@ class RAGEngine:
         recursive: bool = True,
         force: bool = False
     ) -> Dict[str, int]:
-        """Index all matching files in directory while respecting .gitignore and common patterns"""
+        """Index all matching files in directory while respecting .gitignore, common patterns, and .cxm.yaml guardrails"""
         
+        from src.core.patcher import GuardrailManager
+        guardrails = GuardrailManager(directory)
+        scraping_config = guardrails.config.get("scraping", {})
+        include_paths = [Path(directory / p).resolve() for p in scraping_config.get("include_paths", [])]
+        exclude_paths = [Path(directory / p).resolve() for p in scraping_config.get("exclude_paths", [])]
+
         directory = Path(directory).resolve()
         if not directory.exists():
             return {'indexed': 0, 'skipped': 0, 'errors': 0}
@@ -276,13 +283,39 @@ class RAGEngine:
                 continue
                 
             # Security: Prevent Path Traversal / Symlink attacks
-            # Ensure the resolved file path is strictly inside the target directory
             try:
                 resolved_file = file_path.resolve()
                 if not str(resolved_file).startswith(str(directory)):
-                    logger.warning(f"Skipping {file_path}: Resolves outside of target directory (Path Traversal protection)")
                     continue
             except Exception:
+                continue
+
+            # Guardrails: Check Include/Exclude Paths from .cxm.yaml
+            if include_paths:
+                is_included = False
+                for inc in include_paths:
+                    try:
+                        if resolved_file.is_relative_to(inc):
+                            is_included = True
+                            break
+                    except AttributeError:
+                        if str(resolved_file).startswith(str(inc)):
+                            is_included = True
+                            break
+                if not is_included:
+                    continue
+
+            is_excluded = False
+            for exc in exclude_paths:
+                try:
+                    if resolved_file.is_relative_to(exc):
+                        is_excluded = True
+                        break
+                except AttributeError:
+                    if str(resolved_file).startswith(str(exc)):
+                        is_excluded = True
+                        break
+            if is_excluded:
                 continue
 
             # Basic filters
@@ -369,7 +402,9 @@ class RAGEngine:
         if len(self.metadata) == 0:
             return []
         
-        query_emb = self.model.encode([query])[0]
+        query_emb = self.model.encode([query])
+        faiss.normalize_L2(query_emb)
+        query_emb = query_emb[0]
         
         # Search for more than k to account for deleted items
         fetch_k = min(k * 5, len(self.metadata))
@@ -388,7 +423,8 @@ class RAGEngine:
             if metadata.get('_deleted'):
                 continue
                 
-            similarity = float(1 / (1 + dist))
+            # With normalized vectors and Inner Product, distance IS the cosine similarity
+            similarity = float(dist)
             
             if similarity < min_similarity:
                 continue

@@ -64,21 +64,12 @@ class IntentAnalyzer(BaseIntentAnalyzer):
     
     def analyze(self, prompt: str) -> Dict:
         """
-        Analyze prompt for intent and context needs
-        
-        Returns:
-            {
-                'intent': str,
-                'confidence': float,
-                'context_needs': List[str],
-                'entities': List[str],
-                'keywords': List[str]
-            }
+        Stage 1: Goal Analysis.
+        Analyze prompt for intent, sub-goals, and generate optimized search queries.
         """
-        
         prompt_lower = prompt.lower()
         
-        # Score each intent
+        # 1. Score each intent (Rule-based for now, LLM-based in v0.2)
         scores = {}
         for intent, patterns in self.INTENT_PATTERNS.items():
             score = sum(1 for p in patterns if re.search(p, prompt_lower))
@@ -94,27 +85,38 @@ class IntentAnalyzer(BaseIntentAnalyzer):
             intent = 'general'
             confidence = 0.3
         
-        # Context needs
-        context_needs = list(self.CONTEXT_NEEDS.get(intent, ['similar_code']))
-        
-        # Also add needs based on keyword detection
-        extra_needs = self._detect_extra_needs(prompt_lower)
-        for need in extra_needs:
-            if need not in context_needs:
-                context_needs.append(need)
-        
-        # Entities
+        # 2. Extract Entities
         entities = self._extract_entities(prompt)
         
-        # Keywords (most relevant terms)
-        keywords = self._extract_keywords(prompt)
+        # 3. Generate Sub-Goals & Search Queries (The Multi-Query Strategy)
+        sub_goals = []
+        search_queries = [prompt] # Always include the original
         
+        # Heuristics for query generation
+        if intent == 'bug_fixing':
+            sub_goals = ["Identify root cause", "Verify error handling", "Apply regression test"]
+            for entity in entities[:2]:
+                search_queries.append(f"{entity} error exception")
+                search_queries.append(f"{entity} bug fix example")
+        elif intent == 'code_generation':
+            sub_goals = ["Define architecture", "Implement logic", "Export interfaces"]
+            for entity in entities[:2]:
+                search_queries.append(f"{entity} implementation pattern")
+                search_queries.append(f"{entity} usage examples")
+        
+        # Add keyword-based queries
+        keywords = self._extract_keywords(prompt)
+        if len(keywords) >= 2:
+            search_queries.append(" ".join(keywords[:3]))
+
         return {
             'intent': intent,
             'confidence': confidence,
-            'context_needs': context_needs,
+            'context_needs': list(self.CONTEXT_NEEDS.get(intent, ['similar_code'])),
             'entities': entities,
             'keywords': keywords,
+            'sub_goals': sub_goals,
+            'search_queries': list(set(search_queries))
         }
     
     def _detect_extra_needs(self, prompt: str) -> List[str]:

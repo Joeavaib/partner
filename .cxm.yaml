@@ -1,0 +1,19 @@
+# CXM Project Manifest & Guardrails
+
+scraping:
+  # If empty, scopes to the whole project. Otherwise, only these paths are indexed.
+  include_paths:
+    - "src/"
+  # Paths to strictly ignore
+  exclude_paths:
+    - "src/experimental"
+    - "tests"
+
+patching:
+  # modes: 'true' (auto-write), 'ask_first' (interactive prompt), 'false' (dry-run only)
+  mode: ask_first
+  
+  # Security: CXM is only allowed to modify files within these directories
+  allowed_write_paths:
+    - "src/utils"
+    - "src/modules"

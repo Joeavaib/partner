@@ -17,7 +17,9 @@ from datetime import datetime
 from pathlib import Path
 
 # Package imports
-from src import Config, RAGEngine, PromptEnhancer
+from src.config import Config
+from src.core.rag import RAGEngine
+from src.core.enhancer import PromptEnhancer
 from src.utils.i18n import i18n, _
 from src.utils.logger import logger
 from src.utils.paths import format_path, WorkspaceManager

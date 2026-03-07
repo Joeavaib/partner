@@ -44,47 +44,54 @@ class PromptEnhancer:
     def run_evaluation_pipeline(
         self,
         query: str,
-        intent: str,
-        context_needs: List[str],
+        analysis: Dict,
         system_context: Dict = None,
         max_contexts: int = 5,
         token_budget: int = 4000
     ) -> Dict:
         """
-        Unified pipeline for retrieval, reranking, evaluation, and assembly.
-        Used by both interactive and harvest modes.
+        Stage 2 & 3: Multi-query Retrieval & Selection.
+        Runs multiple searches based on Goal Analysis and aggregates unique hits.
         """
-        # 1. Retrieve candidates (get plenty to allow strict filtering)
-        candidates = self.retriever.retrieve(
-            query=query,
-            context_needs=context_needs,
-            k=max_contexts * 3,
-        )
+        all_candidates = []
+        seen_paths = set()
         
-        # 2. Rerank
+        # 1. Multi-Query Retrieval (Stage 2)
+        queries = analysis.get('search_queries', [query])
+        for q in queries:
+            candidates = self.retriever.retrieve(
+                query=q,
+                context_needs=analysis.get('context_needs', []),
+                k=max_contexts * 2,
+            )
+            for cand in candidates:
+                if cand['path'] not in seen_paths:
+                    all_candidates.append(cand)
+                    seen_paths.add(cand['path'])
+        
+        # 2. Rerank the aggregated set
         ranked = self.reranker.rerank(
             query=query,
-            candidates=candidates,
-            top_k=max_contexts * 2,
+            candidates=all_candidates,
+            top_k=max_contexts * 3,
             token_budget=token_budget * 2
         )
         
-        # 3. Evaluate & Deduplicate (Selection Layer)
+        # 3. Evaluate & Deduplicate (Stage 3: Selection Layer)
         evaluated_selection = self.evaluator.evaluate_batch(query, ranked)
         
         # Final limit
         final_selection = evaluated_selection[:max_contexts]
         
-        # 4. Assemble
+        # 4. Assemble & Synthesize (Stage 4)
         result = self.assembler.assemble(
             user_prompt=query,
-            intent=intent,
+            intent=analysis['intent'],
             contexts=final_selection,
             system_context=system_context,
             max_tokens=token_budget,
         )
         
-        # Attach the evaluation log so callers can render the checklist if they want
         result['evaluation_log'] = [
             {
                 'name': cand['name'], 
