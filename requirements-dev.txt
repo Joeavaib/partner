@@ -1,0 +1,1 @@
+pytest\nruff\nmypy\npip-audit

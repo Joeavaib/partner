@@ -1,28 +1,39 @@
-# CXM Ignore Rules
-meta-orchestrator/sessions/
-meta-orchestrator/knowledge-base/
-meta-orchestrator/src/cxm.egg-info/
-meta-orchestrator/src/meta_clawd.egg-info/
-meta-orchestrator/__pycache__/
-meta-orchestrator/src/**/__pycache__/
-meta-orchestrator/tools/__pycache__/
-meta-orchestrator/visions.md
-*.pyc
-.DS_Store
-.env
-current_task_prompt.txt
+# Python Caches
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
 
-# Virtual Environments
-bin/
-include/
-lib/
-lib64/
-share/
-pyvenv.cfg
-partnerenv/
+# Environments
 .venv/
-env/
 venv/
-node_modules/
-dist/
+ENV/
+env/
+partnerenv/
+
+# Build & Dist
 build/
+dist/
+*.egg-info/
+
+# OS Files
+.DS_Store
+Thumbs.db
+
+# CXM Local Data
+knowledge-base/
+*.index
+metadata.json
+vault_data.json
+context_store.json
+.cxm/
+sessions/
+current_task_prompt.txt
+latest_prompt.txt
+
+# Secrets
+.env
+*.key
+*.pem

@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  cxm-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - ./meta-orchestrator:/app/meta-orchestrator
+      # Mount a local workspace for testing the tool
+      - ./workspace:/app/workspace
+    environment:
+      - CXM_WORKSPACE=/app/workspace
+      - PYTHONPATH=/app/meta-orchestrator/src
+    tty: true
+    stdin_open: true
