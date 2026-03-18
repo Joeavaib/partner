@@ -1,0 +1,17 @@
+Metadata-Version: 2.4
+Name: contextmachine
+Version: 0.1.0
+Summary: CXM - The Developer's Context Machine for AI Orchestration
+Author-email: Joe <joe@example.com>
+Requires-Python: >=3.8
+Description-Content-Type: text/markdown
+Requires-Dist: sentence-transformers>=2.2.0
+Requires-Dist: faiss-cpu>=1.7.4
+Requires-Dist: numpy>=1.24.0
+Requires-Dist: scikit-learn>=1.3.0
+Requires-Dist: rank-bm25>=0.2.2
+Requires-Dist: pyyaml>=6.0
+Requires-Dist: tqdm>=4.65.0
+Requires-Dist: rich>=13.0.0
+Requires-Dist: pyperclip>=1.8.2
+Requires-Dist: questionary>=2.0.0

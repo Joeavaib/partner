@@ -20,16 +20,19 @@ dependencies = [
     "pyyaml>=6.0",
     "tqdm>=4.65.0",
     "rich>=13.0.0",
-    "pyperclip>=1.8.2"
+    "pyperclip>=1.8.2",
+    "questionary>=2.0.0",
+    "flet>=0.21.0"
 ]
 
 [project.scripts]
-cxm = "cxm.cli:main"
-cxmd = "cxm.dashboard:main"
+cxm = "cli:main"
+cxmd = "dashboard:main"
+cxmg = "gui:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
-include = ["cxm*"]
+include = ["*"]
 
 [tool.setuptools.package-data]
-"cxm.locales" = ["*.yaml"]
+"locales" = ["*.yaml"]

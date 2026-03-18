@@ -12,6 +12,7 @@ from sentence_transformers import SentenceTransformer
 import faiss
 import numpy as np
 from tqdm import tqdm
+from filelock import FileLock
 
 from src.utils.logger import logger
 
@@ -24,18 +25,48 @@ class RAGEngine:
     - Metadata via JSON (no external DB needed)
     - Incremental indexing with change detection
     - Optimized: Full content is not stored in metadata.json to save space
+    - Concurrency Safe: Uses FileLock to prevent index corruption
+    - Security: Automatically masks secrets (API keys, tokens) in metadata
     """
     
+    SECRET_PATTERNS = {
+        "Generic API Key": r'(?i)(?:key|api|token|secret|auth|password|pwd)[=:\s"\']+[0-9a-zA-Z]{16,64}',
+        "AWS Access Key": r'AKIA[0-9A-Z]{16}',
+        "AWS Secret Key": r'(?i)aws_secret_access_key[=:\s"\']+[0-9a-zA-Z/+=]{40}',
+        "GitHub Token": r'gh[pous]_[a-zA-Z0-9]{36}',
+        "Slack Token": r'xox[baprs]-[0-9a-zA-Z]{10,48}',
+        "Stripe Secret": r'sk_live_[0-9a-zA-Z]{24}',
+        "OpenAI API Key": r'sk-[a-zA-Z0-9]{32,64}',
+        "Private Key": r'-----BEGIN (?:RSA |DSA |EC |OPENSSH )?PRIVATE KEY-----'
+    }
+
+    def _mask_secrets(self, text: str) -> str:
+        """Finds and replaces sensitive strings with [REDACTED_SECRET]"""
+        masked_text = text
+        for label, pattern in self.SECRET_PATTERNS.items():
+            matches = re.findall(pattern, masked_text)
+            for match in matches:
+                # If the match contains high entropy or specific prefixes, mask it
+                masked_text = masked_text.replace(match, f"[REDACTED_{label.replace(' ', '_').upper()}]")
+        return masked_text
+
     def __init__(self, workspace: Path, model_name: str = 'all-MiniLM-L6-v2'):
         # Suppress logging before model load
         os.environ['TRANSFORMERS_VERBOSITY'] = 'error'
         os.environ['HF_HUB_DISABLE_PROGRESS_BARS'] = '1'
+        
+        # Additional silence for torch/sentence-transformers
+        import logging
+        logging.getLogger("transformers").setLevel(logging.ERROR)
+        logging.getLogger("sentence_transformers").setLevel(logging.ERROR)
         
         self.workspace = Path(workspace)
         self.workspace.mkdir(parents=True, exist_ok=True)
         
         self.index_path = self.workspace / "faiss.index"
         self.metadata_path = self.workspace / "metadata.json"
+        self.lock_path = self.workspace / "rag.lock"
+        self.lock = FileLock(str(self.lock_path))
         
         # Load model
         logger.info(f"Initializing RAGEngine with model: {model_name}")
@@ -43,22 +74,23 @@ class RAGEngine:
         self.embedding_dim = self.model.get_sentence_embedding_dimension()
         
         # Load or create index
-        if self.index_path.exists() and self.metadata_path.exists():
-            try:
-                self.index = faiss.read_index(str(self.index_path))
-                with open(self.metadata_path) as f:
-                    self.metadata = json.load(f)
-                logger.info(f"Loaded existing index with {len(self.metadata)} documents.")
-            except Exception as e:
-                logger.error(f"Failed to load index: {e}. Creating new one.")
-                # Upgrade to HNSW for scalable, fast approximate nearest neighbor search
+        with self.lock:
+            if self.index_path.exists() and self.metadata_path.exists():
+                try:
+                    self.index = faiss.read_index(str(self.index_path))
+                    with open(self.metadata_path) as f:
+                        self.metadata = json.load(f)
+                    logger.info(f"Loaded existing index with {len(self.metadata)} documents.")
+                except Exception as e:
+                    logger.error(f"Failed to load index: {e}. Creating new one.")
+                    # Upgrade to HNSW for scalable, fast approximate nearest neighbor search
+                    self.index = faiss.IndexHNSWFlat(self.embedding_dim, 32, faiss.METRIC_INNER_PRODUCT)
+                    self.index.hnsw.efConstruction = 128
+                    self.metadata = []
+            else:
                 self.index = faiss.IndexHNSWFlat(self.embedding_dim, 32, faiss.METRIC_INNER_PRODUCT)
                 self.index.hnsw.efConstruction = 128
                 self.metadata = []
-        else:
-            self.index = faiss.IndexHNSWFlat(self.embedding_dim, 32, faiss.METRIC_INNER_PRODUCT)
-            self.index.hnsw.efConstruction = 128
-            self.metadata = []
     
     def _file_hash(self, path: Path) -> str:
         return hashlib.md5(path.read_bytes()).hexdigest()
@@ -172,7 +204,7 @@ class RAGEngine:
                     'total_chunks': len(chunks),
                     'hash': file_hash,
                     'indexed_at': datetime.now().isoformat(),
-                    'content_preview': chunk, # In chunk mode, preview IS the chunk
+                    'content_preview': self._mask_secrets(chunk), # Mask sensitive data in preview
                 })
             
             return True
@@ -220,7 +252,8 @@ class RAGEngine:
         directory: Path,
         extensions: Optional[List[str]] = None,
         recursive: bool = True,
-        force: bool = False
+        force: bool = False,
+        is_ingest: bool = False
     ) -> Dict[str, int]:
         """Index all matching files in directory while respecting .gitignore, common patterns, and .cxm.yaml guardrails"""
         
@@ -262,6 +295,9 @@ class RAGEngine:
             'package-lock.json', 'pnpm-lock.yaml', 'yarn.lock', 'composer.lock',
             'Cargo.lock', 'Gemfile.lock', 'poetry.lock', 'mix.lock'
         }
+        
+        # Ingest mode specific lists
+        ingest_exts = {'.md', '.json', '.yaml', '.yml', '.txt', '.csv', '.toml', '.ini'}
         
         # 10 MB size limit for indexing to avoid models/huge data
         MAX_FILE_SIZE = 10 * 1024 * 1024 
@@ -322,11 +358,15 @@ class RAGEngine:
             if any(part in skip_dirs or part.endswith('.egg-info') for part in file_path.parts):
                 continue
                 
-            if file_path.name.startswith('.') or file_path.name in skip_names:
-                continue
-                
-            if file_path.suffix.lower() in skip_exts:
-                continue
+            if is_ingest:
+                if file_path.suffix.lower() not in ingest_exts and file_path.name.lower() not in {"dockerfile", "docker-compose.yml", "package.json", "requirements.txt"}:
+                    continue
+            else:
+                if file_path.name.startswith('.') or file_path.name in skip_names:
+                    continue
+                    
+                if file_path.suffix.lower() in skip_exts:
+                    continue
                 
             # Size check
             try:
@@ -379,8 +419,8 @@ class RAGEngine:
             'size': len(content),
             'hash': hashlib.md5(content.encode()).hexdigest(),
             'indexed_at': datetime.now().isoformat(),
-            'content_preview': content[:1000],
-            'full_content': content, # Keep for non-file based texts
+            'content_preview': self._mask_secrets(content[:1000]), # Mask secrets in preview
+            'full_content': self._mask_secrets(content), # Mask secrets in stored content
         }
         
         if metadata:
@@ -459,9 +499,10 @@ class RAGEngine:
     def save(self):
         """Persist to disk"""
         try:
-            faiss.write_index(self.index, str(self.index_path))
-            with open(self.metadata_path, 'w') as f:
-                json.dump(self.metadata, f)
+            with self.lock:
+                faiss.write_index(self.index, str(self.index_path))
+                with open(self.metadata_path, 'w') as f:
+                    json.dump(self.metadata, f)
         except Exception as e:
             logger.error(f"Failed to save index: {e}")
     
@@ -484,6 +525,8 @@ class RAGEngine:
     def clear(self):
         """Reset entire index"""
         logger.info("Clearing entire index.")
-        self.index = faiss.IndexFlatL2(self.embedding_dim)
-        self.metadata = []
-        self.save()
+        with self.lock:
+            self.index = faiss.IndexHNSWFlat(self.embedding_dim, 32, faiss.METRIC_INNER_PRODUCT)
+            self.index.hnsw.efConstruction = 128
+            self.metadata = []
+            self.save()

@@ -9,12 +9,29 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 from rich.prompt import Prompt, Confirm
-from rich.layout import Layout
-from rich.live import Live
-from rich.align import Align
 from rich import box
 from datetime import datetime
 from pathlib import Path
+import questionary
+from questionary import Style
+
+# Define a modern, cyan/blue oriented style for the CLI
+custom_style = Style([
+    ('qmark', 'fg:#00ffff bold'),       # token in front of the question
+    ('question', 'bold'),               # question text
+    ('answer', 'fg:#00ff00 bold'),      # submitted answer text behind the question
+    ('pointer', 'fg:#00ffff bold'),     # pointer used in select and checkbox prompts
+    ('highlighted', 'fg:#00ffff bold'), # pointed-at choice in select and checkbox prompts
+    ('selected', 'fg:#00ff00'),         # style for a selected item of a checkbox
+    ('separator', 'fg:#cc5454'),        # separator in lists
+    ('instruction', 'fg:#808080 italic'),     # user instructions for select, rawselect, checkbox
+    ('text', ''),                       # plain text
+    ('disabled', 'fg:#858585 italic')   # disabled choices
+])
+
+# Ensure we can find the modules if we're running locally without installation
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 # Package imports
 from src.config import Config
@@ -91,26 +108,10 @@ class CXMDashboard:
         )
         return Panel(grid, style="blue")
 
-    def show_menu(self):
-        table = Table(box=box.ROUNDED, expand=True, show_header=False)
-        table.add_column("Key", style="cyan", width=5)
-        table.add_column("Action", style="white")
-        table.add_row("1", self.t('prompt_builder'))
-        table.add_row("2", self.t('ctx'))
-        table.add_row("3", self.t('rag_search'))
-        table.add_row("4", self.t('rag_index'))
-        table.add_row("5", self.t('sessions'))
-        table.add_row("6", self.t('language'))
-        table.add_row("0", self.t('exit'))
-        return Panel(table, title=self.t('menu_title'), border_style="green")
-
     def display_changes(self):
         with console.status("[bold green]" + self.t('status.gathering_ctx')):
-            # If we are in a named project context but NOT in its directory, 
-            # we might want to skip git status or show it for that remote dir.
-            # For now, we show local git context of where the dashboard is.
             try:
-                from tools.context_gatherer import gather_all
+                from src.tools.context_gatherer import gather_all
                 data = gather_all()
             except Exception as e:
                 output = self.run_tool("context_gatherer")
@@ -135,14 +136,21 @@ class CXMDashboard:
     def settings_language(self):
         console.clear()
         console.print(Panel(f"[bold cyan]{self.t('settings.lang_title')}[/bold cyan]", border_style="cyan"))
-        choices = ["en", "de"]
         current = self.config.get('language', 'en')
-        new_lang = Prompt.ask(f"\n{self.t('settings.lang_select')} ({self.t('settings.lang_current')}: [bold]{current}[/bold])", choices=choices, default="en" if current == "de" else "de")
-        self.config.set('language', new_lang)
-        self.lang = new_lang
-        i18n.load(new_lang)
-        console.print(f"\n[green]{self.t('settings.lang_set')}: {new_lang}[/green]")
-        input("\n" + self.t('back'))
+        
+        new_lang = questionary.select(
+            f"{self.t('settings.lang_select')} ({self.t('settings.lang_current')}: {current})",
+            choices=["en", "de"],
+            default=current,
+            style=custom_style
+        ).ask()
+        
+        if new_lang:
+            self.config.set('language', new_lang)
+            self.lang = new_lang
+            i18n.load(new_lang)
+            console.print(f"\n[green]{self.t('settings.lang_set')}: {new_lang}[/green]")
+            input("\n" + self.t('back'))
 
     def rag_search(self):
         query = Prompt.ask("\n[cyan]" + self.t('search_query') + "[/cyan]")
@@ -154,28 +162,56 @@ class CXMDashboard:
 
     def manage_sessions(self):
         output = self.run_tool("session_manager", ["list"])
-        console.print(Panel(output, title=self.t('sessions_ui.title'), border_style="magenta"))
-        choices = ["c", "s", ""]
-        action = Prompt.ask("\n[magenta]" + self.t('session_action') + "[/magenta]", choices=choices, default="")
-        if action == "c":
-            name = Prompt.ask(self.t('sessions_ui.name'))
-            prompt = Prompt.ask(self.t('sessions_ui.plan_prompt'))
+        console.print(Panel(output, title="📂 " + self.t('sessions_ui.title'), border_style="magenta"))
+        
+        choices = [
+            questionary.Choice(title="✨ Create New Session", value="create"),
+            questionary.Choice(title="🚀 Start Existing Session", value="start"),
+            questionary.Choice(title="⬅️  Back to Menu", value="back")
+        ]
+        
+        action = questionary.select(
+            self.t('session_action'),
+            choices=choices,
+            style=custom_style
+        ).ask()
+        
+        if action == "create":
+            name = Prompt.ask("📝 " + self.t('sessions_ui.name'))
+            prompt = Prompt.ask("💡 " + self.t('sessions_ui.plan_prompt'))
             self.run_tool("session_manager", ["create", name, prompt])
-        elif action == "s":
-            sid = Prompt.ask("Session ID")
+        elif action == "start":
+            sid = Prompt.ask("🆔 Session ID")
             self.run_tool("session_manager", ["start", sid])
         
     def main_loop(self):
         while True:
             console.clear()
             console.print(self.get_header())
-            console.print(self.show_menu())
-            choice = Prompt.ask("\n[green]" + self.t('choose') + "[/green]", choices=["1", "2", "3", "4", "5", "6", "0"], default="1")
+            
+            choices = [
+                questionary.Choice(title=f"🧠 {self.t('prompt_builder')}", value="1"),
+                questionary.Choice(title=f"🔍 {self.t('ctx')}", value="2"),
+                questionary.Choice(title=f"📖 {self.t('rag_search')}", value="3"),
+                questionary.Choice(title=f"🏗️  {self.t('rag_index')}", value="4"),
+                questionary.Choice(title=f"📂 {self.t('sessions')}", value="5"),
+                questionary.Choice(title=f"🌐 {self.t('language')}", value="6"),
+                questionary.Choice(title=f"🚪 {self.t('exit')}", value="0")
+            ]
+            
+            choice = questionary.select(
+                self.t('choose'),
+                choices=choices,
+                use_indicator=True,
+                pointer="»",
+                style=custom_style
+            ).ask()
+            
             if choice == "1": self.build_prompt()
             elif choice == "2": self.display_changes()
             elif choice == "3": self.rag_search()
             elif choice == "4":
-                path = Prompt.ask(self.t('path_prompt'))
+                path = Prompt.ask("📍 " + self.t('path_prompt'), default=".")
                 status_text = self.t('indexing').replace("...", f" {path}...")
                 with console.status(f"[bold]{status_text}[/bold]"):
                     cmd_args = ["index", path, "--recursive"] if os.path.isdir(path) else ["index", path]
@@ -184,8 +220,8 @@ class CXMDashboard:
                 input("\n" + self.t('back'))
             elif choice == "5": self.manage_sessions()
             elif choice == "6": self.settings_language()
-            elif choice == "0":
-                console.print(f"[yellow]{self.t('bye')}[/yellow]")
+            elif choice == "0" or choice is None:
+                console.print(f"[yellow]👋 {self.t('bye')}[/yellow]")
                 break
 
     def build_prompt(self):
@@ -195,7 +231,7 @@ class CXMDashboard:
         prompt_text = Prompt.ask(f"\n[cyan]{self.t('builder.goal_q')}[/cyan]")
         if not prompt_text: return
 
-        from tools.context_gatherer import gather_all
+        from src.tools.context_gatherer import gather_all
         rag = RAGEngine(self.kb_path)
         enhancer = PromptEnhancer(rag)
 
@@ -233,14 +269,28 @@ class CXMDashboard:
         
         if Confirm.ask(f"\n{i18n.t('cli.ask.rag_confirm')}", default=True):
             with console.status("[bold yellow]" + i18n.t('cli.ask.searching_rag')):
-                candidates = enhancer.retriever.retrieve(query=refined_prompt, context_needs=analysis['context_needs'], k=15)
-                selected = enhancer.reranker.rerank(query=refined_prompt, candidates=candidates, top_k=5, token_budget=4000)
-                result = enhancer.assembler.assemble(user_prompt=prompt_text, intent=analysis['intent'], contexts=selected, system_context=system_context, max_tokens=4000)
-                final_prompt = result['enhanced_prompt']
+                # Use unified pipeline from Enhancer
+                pipeline_result = enhancer.run_evaluation_pipeline(
+                    query=refined_prompt,
+                    analysis=analysis,
+                    system_context=system_context,
+                    max_contexts=5,
+                    token_budget=4000
+                )
+            
+            console.print("\n[bold]🔍 Context Selection Checklist:[/bold]")
+            for log in pipeline_result['evaluation_log']:
+                icon = "[green]✓[/green]" if log['relevant'] else "[red]✗[/red]"
+                console.print(f"  {icon} [cyan]{log['name'][:25]:<25}[/cyan] [dim]{log['reason']}[/dim]")
+                
+            if not pipeline_result['selected_contexts']:
+                console.print("[yellow]No highly relevant context hits passed the selection layer. Using base prompt.[/yellow]")
+            
+            final_prompt = pipeline_result['enhanced_prompt']
         else:
             final_prompt = refined_prompt
 
-        prompt_file = Path.home() / ".cxm" / "current_task_prompt.txt"
+        prompt_file = WorkspaceManager.get_prompt_output_file()
         prompt_file.parent.mkdir(parents=True, exist_ok=True)
         prompt_file.write_text(final_prompt, encoding='utf-8')
         
@@ -252,9 +302,6 @@ class CXMDashboard:
 
         console.print(f"\n[bold green]✓[/bold green] {self.t('builder.saved')} [cyan]{format_path(str(prompt_file))}[/cyan]")
         console.print(f"{clipboard_msg}")
-        console.print("\n[bold yellow]--- " + self.t('builder.finished').upper() + " (START) ---[/bold yellow]")
-        console.print(final_prompt)
-        console.print("[bold yellow]--- " + self.t('builder.finished').upper() + " (END) ---[/bold yellow]")
         input("\n" + self.t('back'))
 
 def main():

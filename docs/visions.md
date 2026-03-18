@@ -1,43 +1,68 @@
-# 🔮 CXM Vision: The Harvest Mode
+# 🔮 CXM Vision: The Precision Forge
 
-Diese Vision beschreibt die Erweiterung von CXM (ContextMachine) zur primären Kontext-Engine für agentische Workflows (wie die Raven-Luna-Trees Architektur in Maestro).
+Vom Kontext-Tool zum Framework für deterministische Software-Entwicklung. CXM transformiert den "Vibe" des Entwicklers in auditierten, sicheren und produktionsreifen Code.
 
-## 🎯 Ziel: Non-Interactive Context Harvesting
-Bisher ist CXM auf den interaktiven Dialog mit einem menschlichen Entwickler ausgelegt. Um als 'Boden für die Trees' zu dienen, benötigt CXM einen rein maschinellen Modus, der präzisen Kontext für isolierte Coding-Aufgaben liefert.
-
-### Der 'cxm harvest' Befehl
-Ein neuer CLI-Befehl, der ohne Benutzerinteraktion (Gaps werden ignoriert oder inferiert) einen injizierbaren Kontext-Block für LLMs erzeugt.
-
-**Beispiel-Aufruf:**
-```bash
-cxm harvest "auth_logic.py, jwt_helper" --intent "add_refresh_token" --format "xml"
-```
+## 🎯 Ziel: Zero-Friction Enterprise Coding
+Das Ziel ist ein System, das so präzise arbeitet, dass Unternehmen KI-generierten Code ohne manuelle Vorprüfung direkt in Produktion bringen können, weil die Leitplanken (Blueprints) und das Audit-System (Multi-Agent Audit) die Qualität garantieren.
 
 ---
 
-## 🛠️ Technisches Konzept
+## 🚀 Kommende Meilensteine (Roadmap)
 
-1.  **CLI-Integration:** Erweiterung der `cli.py` um einen `harvest` Subparser.
-2.  **Automated RAG-Pipeline:**
-    *   **Intent-Analysis:** Nutzt den bestehenden `IntentAnalyzer`, um Fokus-Keywords zu extrahieren.
-    *   **Silent Retrieval:** Führt das Retrieval & Reranking durch, ohne Rückfragen bei fehlenden Informationen zu stellen (Best-Effort Prinzip).
-    *   **Context Assembly:** Formatiert die gefundenen Code-Snippets in ein für Coder-Modelle optimiertes Format (z.B. mit `<file_context>` Tags).
-3.  **Output-Handling:** Der Kontext wird direkt über `stdout` ausgegeben, um in Bash-Pipes oder Variablen (`CONTEXT=$(cxm harvest ...)`) genutzt werden zu können.
+### 1. Echte LLM-Integration (The Real Loop)
+- [ ] **Native API-Konnektoren**: Direkte Anbindung an Gemini 1.5 Pro, Claude 3.5 und GPT-4o.
+- [ ] **Local Model Support**: Integration von Ollama/Llama.cpp für 100% Offline-Entwicklung.
+- [ ] **Streaming Patches**: Live-Vorschau der Code-Generierung direkt im Terminal/IDE.
+
+### 2. IDE Integration (VS Code Sidecar)
+- [ ] **CXM VS Code Extension**: Die Power von CXM direkt in der IDE.
+- [ ] **One-Click Apply**: Patches aus `<file_patch>` Blöcken mit einem Klick in der IDE anwenden.
+- [ ] **Inline Diagnostics**: Anzeigen von Audit-Fehlern direkt im Editor (ähnlich wie Linting).
+
+### 3. Blueprint Marketplace & Ecosystem
+- [ ] **Blueprint Library**: Aufbau einer Bibliothek für Standard-Szenarien (FastAPI, React Security, PostgreSQL Optimization).
+- [ ] **Community Patterns**: Ermöglichen des Teilens und Verpflegens von kognitiven Blueprints.
+- [ ] **Project Fingerprinting**: Automatische Generierung von Blueprints basierend auf der Analyse bestehender, hochwertiger Codebases.
+
+### 4. Advanced Agentic Workflows (The "Telepathic" Multi-Step Frontier)
+Für massive, projektweite Refactorings (z. B. "Migration von Flask auf FastAPI" oder "Einbau von Rate-Limiting") reicht ein einzelner Patch-Durchlauf nicht aus. CXM muss dem User "von den Lippen lesen", ohne dabei durch unkontrollierten Übereifer (Overeagerness) das Projekt zu zerstören.
+
+Hier ist der Plan für die **Predictive Multi-Step Logic**:
+
+- **Phase 0: Implicit Gap Inference (Lippenlesen)**
+  - Der Architekt-Agent gleicht den "Vibe" mit dem RAG-Kontext ab und identifiziert implizite, noch nicht existierende Abhängigkeiten (z.B. "User will Rate-Limiting, aber wir haben noch keinen Cache-Service").
+
+- **Phase 1: Shadow-Scaffolding & The Alignment Check**
+  - **Interface-First:** Um Übereifer zu vermeiden, programmiert CXM nicht blind fehlende Kern-Systeme aus. Es generiert stattdessen *abstrakte Interfaces* (Stubs/Contracts) für die fehlenden Teile.
+  - **Vibe-Check:** CXM präsentiert einen `ProposalGraph`: *"Ich passe 3 Router an. Da der Cache-Service fehlt, lege ich dafür ein leeres Interface an, damit der Code sauber kompiliert. Einverstanden?"*
+
+- **Phase 2: Contract-Driven Orchestration**
+  - Arbeitet den bestätigten TaskGraph Knoten für Knoten ab.
+  - Jeder Sub-Task triggert den `run_orchestration_loop` isoliert. Weil in Phase 1 Interfaces gescaffoldet wurden, können neue Features fehlerfrei implementiert und vom **Multi-Agent Audit** geprüft werden, ohne dass die tiefere Logik der neuen Systeme bereits stehen muss.
+  
+- **Phase 3: State & Rollback Management**
+  - **Self-Healing Loop**: Wenn das Audit in einem Sub-Task fehlschlägt, wird der Fehler isoliert korrigiert, ohne den Master-Plan zu verwerfen.
+  - **Micro-Commits**: CXM nutzt Git, um nach jedem erfolgreich gepatchten Knoten einen automatischen Commit zu setzen. Garantiert jederzeit ein 100%iges Rollback.
 
 ---
 
-## ⏱️ Aufwandsschätzung
+## 💰 Monetarisierungs-Strategie
 
-Der geschätzte Gesamtaufwand beträgt ca. **3 Stunden**, da die Kern-Logik (RAG, Indexing, Assembler) bereits in der CXM-Library modular vorhanden ist.
+### A. Enterprise Subscription (B2B)
+Verkauf von Lizenzen für Teams. USP: Zentrale Durchsetzung von Architektur-Standards und Sicherheitsregeln (Governance) beim Einsatz von KI.
 
-| Task | Beschreibung | Aufwand |
-| :--- | :--- | :--- |
-| **CLI Extension** | Hinzufügen des `harvest` Subparsers in `cli.py`. | 0.5h |
-| **Logic Handler** | Implementierung von `handle_harvest` (non-interactive flow). | 1.0h |
-| **Formatting** | Erstellung eines spezialisierten XML/Markdown Output-Formats. | 0.5h |
-| **Validation** | Tests der Bash-Pipes und Integrationstests mit Maestro. | 1.0h |
+### B. Precision Agency Model
+Nutzung des Frameworks als interner "Multiplier", um Software-Projekte in Rekordzeit bei höchster Qualität auszuliefern.
+
+### C. Blueprint-as-a-Service
+Premium-Blueprints für hochregulierte Branchen (Finanz, Medizin, Gov), die spezifische Compliance-Regeln im Code erzwingen.
 
 ---
 
-## 🔗 Integration in Maestro
-Nach der Umsetzung kann Maestro (`orchestrator.py`) CXM direkt als "Sonderwerkzeug" nutzen, um Spezialisten-Prompts mit chirurgisch präzisem Projekt-Kontext anzureichern, was die Token-Kosten senkt und die Erfolgsrate (First-Try-Success) massiv steigert.
+## 🏗️ Erledigte Fundamente (Archiv)
+- ✅ **Nuclear Reset**: Flache, saubere Projektstruktur.
+- ✅ **Precision Protocol**: Schutz gegen Prompt-Injections via Delimiter.
+- ✅ **Multi-Agent Audit**: Sherlock/Watson/Moriarty Logik zur Code-Prüfung.
+- ✅ **FilePatcher & Guardrails**: Sicheres, automatisiertes Schreiben von Dateien.
+- ✅ **Hyper-Präzisions RAG**: HNSW, Cosine Similarity und RRF Integration.
+- ✅ **Dynamic Vibe Router**: Automatische Blueprint-Erkennung basierend auf Intent.

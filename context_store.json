@@ -1,0 +1,10 @@
+{
+  "ProductionSystem": {
+    "project": "ProductionSystem",
+    "vars": {
+      "STABILITY_THRESHOLD": "0.95",
+      "PRIMARY_RATIO": "1:500",
+      "MAX_TEMP_CELSIUS": "32.0"
+    }
+  }
+}

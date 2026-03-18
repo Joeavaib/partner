@@ -16,6 +16,17 @@ Stop writing boilerplate. Just provide the "vibe" or intent, and CXM handles the
 
 ---
 
+## 🔮 Telepathic Multi-Step Refactoring
+
+For massive architectural changes, a single patch isn't enough. CXM introduces the **Telepathic Architect Agent** to manage complex, multi-file refactorings without becoming overeager and ruining your project:
+
+1. **Implicit Gap Inference:** If you ask for "Rate Limiting", CXM scans your code, notices you don't have a caching layer, and identifies this as a missing architectural gap.
+2. **Predictive Shadow-Scaffolding:** Instead of wildly implementing a full Redis client you didn't ask for, CXM generates an abstract `CacheInterface` (stub). This allows the rest of the generated code to compile safely against a contract.
+3. **The Alignment Vibe-Check:** Before any files are touched, CXM presents a `TaskGraph` and asks for your permission: *"I will scaffold a CacheInterface and then write the Middleware. Proceed?"*
+4. **Contract-Driven Execution:** CXM executes the approved steps sequentially, running the Multi-Agent Audit on each node.
+
+---
+
 ## 🛡️ The Precision Security Stack & Guardrails
 
 CXM is hardened for professional environments. You maintain absolute control via the `.cxm.yaml` Project Manifest:

@@ -1,39 +1,26 @@
-# Python Caches
+# Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
 *$py.class
-.pytest_cache/
-.mypy_cache/
-.ruff_cache/
 
 # Environments
-.venv/
+.env
+.venv
 venv/
 ENV/
-env/
-partnerenv/
+partner/
 
-# Build & Dist
-build/
-dist/
-*.egg-info/
-
-# OS Files
-.DS_Store
-Thumbs.db
-
-# CXM Local Data
+# Project specific
 knowledge-base/
-*.index
-metadata.json
-vault_data.json
-context_store.json
-.cxm/
-sessions/
+*.skill
+cxm_agent_bundle/
 current_task_prompt.txt
-latest_prompt.txt
 
-# Secrets
-.env
-*.key
+# Keys and Secrets
 *.pem
+*.key
+WordPressKey*
+
+# Testing
+.pytest_cache/
+tests/output/
